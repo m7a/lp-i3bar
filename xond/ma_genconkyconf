@@ -1,0 +1,194 @@
+#!/bin/sh
+#=======================================================
+# Ma_Sys.ma Conky Configuration File Generator 1.0.1.0,
+# Copyright (c) 2013, 2014 Ma_Sys.ma.
+# For further info send an e-mail to Ma_Sys.ma@web.de.
+#=======================================================
+
+# WARNING: LEGACY CODE. THIS OUTPUTS DATA IN FORMAT NOT SUITABLE FOR NEW
+#          CONKY VERSIONS. USE FOR REFERENCE PURPOSES ONLY
+
+MGCC_DEFAULT_W=1024
+MGCC_BAR_HEIGHT=5
+MGCC_CPU_COLOR=aa0000
+MGCC_SCREENINDEX=/usr/bin/screenindex
+
+MGCC_N_HYPER_THREADING=2 # changes should be unnecessary for this since 1.0.0.5
+
+# Important
+# ---------
+# Small Height = 29
+# Font Sizes 5x7 6x10 7x13 8x13 9x15 10x20
+
+main() {
+	header
+	case "$1" in
+	(-s|s|small) gen_small;;
+	(*)          help;;
+	esac
+	return $?
+}
+
+header() {
+	cat "$0" | head -n 6 | tail -n 5
+	echo "# Generated $(date) with $0"
+	echo
+}
+
+gen_small() {
+	gen_general
+	echo "# Conky configuration for a small bar at the top of the screen"
+	echo alignment top_left
+	printf "# a # should follow: "
+	dw="$(xrandr --query | grep -F " connected " | head -n 1 | \
+					cut -d " " -f 3 | cut -d "x" -f 1)"
+	w=null
+	if [ ! -z "$dw" -a "$dw" -gt "$MGCC_DEFAULT_W" ]; then
+		w=$dw
+	else
+		w=$MGCC_DEFAULT_W
+	fi
+	echo "#"
+
+	fw=6 # font width
+	echo font ${fw}x10
+	pad=4 # padding
+	echo gap_x $pad
+	echo gap_y $pad
+
+	col=$(($w / 5)) # column width
+	bw=$(($col - (9 * $fw))) # bar width
+	bh=$MGCC_BAR_HEIGHT
+	echo default_bar_size $bw $bh
+	echo
+
+	echo TEXT
+
+	# -- First line --------------------------------------------------------
+
+	hbw=$((($bw - $fw) / 2)) # Half bar width
+	fbw=$(($hbw / 2))        # 1/4  bar width
+	# Fix one-pixel bugs
+	prefix_1=0
+	if [ "$((2 * $fbw))" -lt "$hbw" ]; then
+		prefix_1=1
+	fi
+	s="   "
+
+	printf '${color %s}CPU ${cpubar cpu0}' $MGCC_CPU_COLOR
+	cpus=$(grep -E "^$" /proc/cpuinfo | wc -l)
+	cpus_real=$(grep -E "^cpu cores\s+: [0-9]+$" /proc/cpuinfo \
+						| head -n 1 | cut -d ":" -f 2)
+	hyper_threading=null
+	if [ "$cpus" -gt "$cpus_real" ]; then
+		hyper_threading=true
+		MGCC_N_HYPER_THREADING=$(($cpus / $cpus_real))
+	else
+		hyper_threading=false
+	fi
+	i=1
+	if $hyper_threading; then
+		cpus=$(($cpus / $MGCC_N_HYPER_THREADING))
+	fi
+	while [ "$i" -le "$cpus" ]; do
+		in=$(($i + 1))
+		printf "$s$i+$in "
+		gen_cpu_line $hyper_threading $i $hbw $(($fbw + $prefix_1))
+		printf " "
+		gen_cpu_line $hyper_threading $in $hbw $fbw
+		i=$(($in + 1))
+	done
+
+	if [ -x "$MGCC_SCREENINDEX" ]; then
+		printf '%s${color 777777}SCR ${execibar 180 %s -v d ' \
+							"$s" "$MGCC_SCREENINDEX"
+		printf 'current -r | tail -n 1}'
+	fi
+
+	printf '%s${color %s}' "$s" "$MGCC_CPU_COLOR"
+
+	# Temperature
+	case "$(cat /etc/debian_version)" in
+	(6.?)
+		if [ -f /sys/class/hwmon/hwmon0/device/temp1_input ]; then
+			printf 'TMP '
+			printf '${hwmon 0 temp 1/100} ${hwmon 1 temp 1/100} '
+			printf '${hwmon 2 temp 1/100} ${hwmon 3 temp 1/100}  '
+		fi;;
+	(7.?)
+		if [ -f /sys/bus/platform/devices/coretemp.0/temp2_input ]; then
+			printf 'TMP '
+			printf '${platform coretemp.0 temp 2} '
+			printf '${platform coretemp.0 temp 3} '
+			printf '${platform coretemp.0 temp 4} '
+			printf '${platform coretemp.0 temp 5}  '
+		fi;;
+	(*)
+		printf "N_SUPPORT  ";;
+	esac
+	
+	# Fan speed
+	if [ -d "/sys/bus/platform/devices/smsc47b397.1152" ]; then
+		printf 'FAN ${platform smsc47b397.1152 fan 1} '
+		printf '${platform smsc47b397.1152 fan 4}  '
+	fi
+
+	# Loadavg and time
+	printf '$loadavg ${alignr 58}${color ffffff}${font 9x15}'
+	echo   '${time %d.%m.%Y %02k:%M:%S}${voffset -4}$font'
+
+	# -- Second line -------------------------------------------------------
+
+	printf '${color 00aa00}RAM $membar   ${color 00aaaa}SWP $swapbar   '
+	printf '${color 5555cc}SYS ${fs_bar /}'
+
+	if [ -d /external1 ]; then
+		nw="$(($bw / 2 - $fw * 3))"
+		printf '%sDAT ${fs_bar %s,%s /data}' "$s" "$bh" "$nw"
+		printf '  EXT ${fs_bar %s,%s /external1}' "$bh" "$nw"
+	elif [ -d /data ]; then
+		printf '%sDAT ${fs_bar %s,%s /data}' "$s" "$bh" "$bw"
+	fi
+
+	printf "$s"
+	echo '${color aa0070}U/D $totalup $totaldown  $upspeed $downspeed'
+}
+
+# $1: HT, $2: CPU; $3: Half bar width; $4 1/4 bar width
+gen_cpu_line() {
+	if $1; then
+		p2=$(($2 * 2))
+		p1=$(($p2 - 1))
+		printf '${cpubar cpu%s %s,%s}${cpubar cpu%s %s,%s}' \
+			$p1 $MGCC_BAR_HEIGHT $4 $p2 $MGCC_BAR_HEIGHT $4
+	else
+		printf '${cpubar cpu%s %s,%s}' $2 $MGCC_BAR_HEIGHT $3
+	fi
+}
+
+gen_general() {
+	echo "# Useful defaults for all Ma_Sys.ma Conky Configurations"
+	echo "background no"
+	echo "total_run_times 0           # Keep running till termination"
+	echo "update_interval 1           # We have a clock => max RC"
+	echo "own_window yes              # Do not create own window"
+	echo "own_window_type panel       # Do not draw window borders"
+	echo "own_window_transparent yes  # Be transparent"
+	echo "double_buffer yes           # Do not flicker"
+	echo "border_width 1              # Small and nice borders"
+	echo "default_color aaaaaa        # Non-annoyring background"
+	echo "default_shade_color black"  
+	echo "no_buffers yes              # Buffers are \"unused\" memory"
+	echo "use_spacer none             # We layout ourselves"
+	echo "short_units yes             # Better readable units"
+	echo "override_utf8_locale no"
+}
+
+help() {
+	echo "USAGE $0 small|-s|s"
+	echo
+	echo "Generates a configuration file for Conky."
+	return 1
+}
+
+main "$@" || return $?

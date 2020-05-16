@@ -1,0 +1,796 @@
+#!/usr/bin/perl
+# Ma_Sys.ma i3bar Script 1.0.0, Copyright (c) 2020 Ma_Sys.ma.
+# For further info send an e-mail to Ma_Sys.ma@web.de.
+
+# This code incoporates an external module under different copyright, see
+# section "BEGIN CpuTopology.pm Module"
+
+use 5.010;
+use strict;
+use warnings FATAL => 'all';
+use autodie;
+
+require List::Util;
+require Sys::Statistics::Linux; # libsys-statistics-linux-perl
+require Filesys::Df; # libfilesys-df-perl
+require Time::HiRes;
+require IO::Socket;
+require IO::Interface::Simple; # libio-interface-perl
+require File::Which; # libfile-which-perl
+#require Linux::MemInfo; # libsys-meminfo-perl
+use Try::Tiny;
+use File::Basename;
+use Data::Dumper 'Dumper'; # debug only
+
+use constant COLOR_NORM => "#eeeeee";
+use constant COLOR_WARN => "#ffff00";
+use constant COLOR_CRIT => "#ff0000";
+
+use constant BGCOLOR_NORM => "#000000";
+use constant BGCOLOR_USED => "#005050";
+use constant BGCOLOR_FREE => "#003030";
+
+use constant I3_STAPLES => ",\"separator\":false,\"separator_block_width\":0";
+
+my $use_json;
+my $is_first_entry = 0;
+my $system_is_on_ac = 1;
+
+sub main {
+	$use_json = ($#_ == 0 and $_[0] eq "--json");
+
+	my $lxs = Sys::Statistics::Linux->new(
+		sysinfo  => 1,
+		cpustats => 1,
+		memstats => 1,
+		loadavg  => 1,
+		netstats => 1,
+		diskstats => 1,
+	);
+	$lxs->init;
+
+	if($use_json) {
+		print "{\"version\":1}\n[\n";
+	}
+
+	my @next_rare_task = Time::HiRes::gettimeofday();
+	my @timestamp = Time::HiRes::gettimeofday(); # seconds, microseconds
+	my $proctime = 0;
+
+	my $rare_task_interval_secs = 60;
+	my @intervals = (1_000_000, 2_000_000, 10_000_000, 20_000_000);
+
+	my $intidx = 0;
+	while(1) {
+		# wait till the next second starts + 50 microsecs to surely
+		# start in the next second
+		my $dly = $intervals[$intidx] + 50 - $timestamp[1];
+		Time::HiRes::usleep($dly) if($dly > 0);
+		@timestamp = Time::HiRes::gettimeofday(); # seconds,
+		if($proctime > $intervals[$intidx]) {
+			# we were unable to compute quickly enough, increase
+			# wait interval to reduce system load (if possible).
+			$intidx++ if($intidx < $#intervals);
+		} elsif($dly > $intervals[0] and $intidx > 0 and
+							$system_is_on_ac) {
+			$intidx--;
+		}
+
+		my $perform_rare_tasks = (
+					($timestamp[0] > $next_rare_task[0]) or
+					($timestamp[0] == $next_rare_task[0] and
+					$timestamp[1] > $next_rare_task[1]));
+		if($perform_rare_tasks) {
+			@next_rare_task = ($timestamp[0] +
+				$rare_task_interval_secs, $timestamp[1]);
+		}
+
+		write_blocks($lxs->get, \@timestamp, $perform_rare_tasks);
+		# maximum delay for battery systems
+		$intidx = $#intervals if(not $system_is_on_ac);
+		
+		my @timestamp2 = Time::HiRes::gettimeofday(); # seconds,
+		$proctime = ($timestamp2[0] - $timestamp[0]) * 1_000_000 +
+						$timestamp2[1] - $timestamp[1];
+		@timestamp = Time::HiRes::gettimeofday();
+	}
+}
+
+sub write_blocks {
+	my ($stats, $timestamp_ref, $perform_rare_tasks) = @_;
+
+	$is_first_entry = 1;
+
+	write_mdstat_block($perform_rare_tasks);
+	write_host_block($stats->{sysinfo});
+	write_cpu_block($stats->{cpustats});
+	write_ram_block($stats->{memstats});
+	write_swap_block($stats->{memstats});
+	write_disk_block($perform_rare_tasks, $stats->{diskstats});
+
+	write_screenindex_block($perform_rare_tasks);
+	write_network_interfaces_block($perform_rare_tasks, $stats->{netstats});
+	write_acpi_battery_block($perform_rare_tasks);
+	write_ups_block($perform_rare_tasks);
+
+	# [laptop: wifi connectivity]
+	# [laptop: acpi battery]
+
+	write_loadavg_block($stats->{loadavg});
+	write_clock_block($timestamp_ref);
+
+	if($use_json) {
+		print("],");
+	}
+	print("\n");
+}
+
+sub write_mdstat_block {
+	my $perform_rare_tasks = shift;
+
+	state $mdstat = undef;
+
+	if($perform_rare_tasks) {
+		open(my $fh, "/proc/mdstat");
+		my $curminproc = 1000;
+		$mdstat = undef;
+		while(<$fh>) {
+			next unless $_ =~ / finish=/;
+			my $curproc = index(">", $_);
+			if($curproc < $curminproc) {
+				my $idx0 = index($_, "[");
+				my $idx1 = index($_, "]");
+				$mdstat = substr($_, $idx0, $idx1 - $idx0 + 1);
+				$curminproc = $curproc;
+			}
+		}
+		close($fh);
+	}
+
+	write_entry("M".$mdstat, COLOR_WARN) if(defined($mdstat));
+}
+
+# $1 entry data
+# $2 color
+# $3 optional background color
+sub write_entry {
+	my $entry = shift;
+	my $color = shift;
+	my $bgcol = BGCOLOR_NORM;
+	if($#_ >= 0) {
+		$bgcol = shift;
+	}
+	if($use_json) {
+		if($is_first_entry) {
+			$is_first_entry = 0;
+			print "[";
+		} else {
+			print ",";
+		}
+		write_json_colored_entry($entry, $color, $bgcol);
+		print ",{\"full_text\":\"  \"".I3_STAPLES."}";
+	} else {
+		print $entry."  ";
+	}
+}
+
+# $1 entry data
+# $2 color
+# $3 background color
+sub write_json_colored_entry {
+	my ($entry, $color, $bgcol) = @_;
+	$entry =~ s/["\\]/\\$1/g;
+	print "{\"full_text\":\"$entry\",\"background\":\"$bgcol\",".
+					"\"color\":\"$color\"".I3_STAPLES."}";
+}
+
+sub write_entry_no_sep {
+	my ($entry, $color, $bgcol) = @_;
+	if($use_json) {
+		print ",";
+		write_json_colored_entry($entry, $color, $bgcol);
+	} else {
+		print $entry;
+	}
+}
+
+sub write_host_block {
+	my $stats = shift;
+	write_entry($stats->{hostname}, COLOR_NORM);
+}
+
+sub write_cpu_block {
+	my $stats = shift;
+
+	# state to avoid querying topology every time.
+	state $topo_sockets          = CpuTopology::n_sockets();
+	state $topo_cores_per_socket = CpuTopology::n_cores_per_socket();
+	state $topo_threads_per_core = CpuTopology::n_threads_per_core();
+	state $topo_threads_total    = CpuTopology::cpus();
+	
+	my $entry = "C";
+	my $curcore = 0;
+	my $curthread = 0;
+	my $sep = "";
+	for(my $i = 0; $i < $topo_threads_total; $i++) {
+		$entry .= $sep.get_gauge_vert(100.0 -
+						$stats->{"cpu$i"}->{idle});
+		if(++$curthread >= $topo_threads_per_core) {
+			$curthread = 0;
+			if(++$curcore >= $topo_cores_per_socket) {
+				$curcore = 0;
+				$sep = "|";
+			} else {
+				$sep = " ";
+			}
+		} else {
+			$sep = "";
+		}
+	}
+
+	write_entry($entry, color_by_threshold(100.0 - $stats->{cpu}->{idle},
+								20.0, 80.0));
+}
+
+# $1 percentage [0;100]
+# @return single char with gauge
+sub get_gauge_vert {
+	my $val = shift;
+ 	return "█" if($val > 88);
+	return "▇" if($val > 75);
+	return "▆" if($val > 63);
+	return "▅" if($val > 50);
+	return "▄" if($val > 38);
+	return "▃" if($val > 25);
+	return "▂" if($val > 12.5);
+	return "▁";
+}
+
+# $1 num, $2 lower, $3 upper
+sub color_by_threshold {
+	my ($num, $lower, $upper) = @_;
+	return ($num < $lower)? COLOR_NORM:
+				(($num > $upper)? COLOR_CRIT: COLOR_WARN);
+}
+
+sub write_ram_block {
+	my $stats    = shift;
+
+	my $memtotal = $stats->{memtotal};
+	my $factor   = get_mem_factor_bytes($memtotal);
+	my $totalstr = sprintf("%.0f", $memtotal/$factor);
+	my $fmt      = "R%".length($totalstr).".0f/%s";
+
+	# TODO HACK BIS LIB GEFIXT BZW. EVENTUELL EIGENE AUSWERTEROUTINE NUTZEN?
+	# -> https://rt.cpan.org/Public/Bug/Display.html?id=132484
+	open(my $fh, "/proc/meminfo");
+	my $srecl = 0;
+	while(<$fh>) {
+		next unless $_ =~ /^SReclaimable:/;
+		my @val = split(/\s+/);
+		$srecl = $val[1];
+		last;
+	}
+	close($fh);
+
+	my $memutil = $memtotal - $stats->{realfree} - $srecl;
+	my $entry   = sprintf($fmt, $memutil / $factor, $totalstr);
+	write_entry($entry, color_by_threshold($memutil / $memtotal,
+								0.65, 0.85));
+}
+
+sub get_mem_factor_bytes {
+	my $val = shift;
+	return (($val / 1024 / 1024) >= 10.0)? 1024*1024: 1024;
+}
+
+sub write_swap_block {
+	my $stats = shift;
+
+	# looks redundant to above, but could be made `state` for advanced
+	# performance, thus not part of the same function yet?
+	my $swaptotal = $stats->{swaptotal};
+	my $factor    = get_mem_factor_bytes($swaptotal);
+	my $totalstr  = sprintf("%.0f", $swaptotal/$factor);
+	my $fmt       = "SW%".length($totalstr).".0f/%s";
+
+	my $swaputil  = $stats->{swapused} - $stats->{swapcached};
+	write_entry(sprintf($fmt, $swaputil / $factor, $totalstr),
+			color_by_threshold($swaputil/$swaptotal, 0.09, 0.50));
+}
+
+sub write_disk_block {
+	state @disks;
+
+	my ($perform_rare_tasks, $stats) = @_;
+	if($perform_rare_tasks) {
+		@disks = ();
+		populate_disks_info(\@disks);
+	}
+
+	for my $disk (@disks) {
+		# disk load segment
+		my ($seg_dl, $color_dl) = get_disk_stats($stats, $disk->[2]);
+		# for simplicity, add label before seg_dl (will color the
+		# label under IO load but simplifies the case distinction
+		# below...)
+		$seg_dl = $disk->[1].$seg_dl;
+
+		# disk usage segment
+		my $df        = Filesys::Df::df($disk->[0]);
+		my $total     = $df->{blocks};
+		my $used      = $total - $df->{bavail};
+		my $util_perc = $used * 100 / $total;
+		my $totalgstr = sprintf("%.0f", $total / 1024 / 1024);
+		my $seg_du    = sprintf("%".length($totalgstr).".0f",
+					$used / 1024 / 1024)."/".$totalgstr;
+		my $color_du  = color_by_threshold($util_perc, 87, 97);
+
+		# write segments
+		#write_entry_no_sep($disk->[1], COLOR_NORM, BGCOLOR_NORM);
+		my $seg_width = length($seg_dl) + length($seg_du);
+		my $lim_bgcol = int($used * $seg_width / $total);
+		my $seg_dllen = length($seg_dl);
+		if($lim_bgcol != 0) {
+			write_entry_no_sep(substr($seg_dl, 0, $lim_bgcol),
+						$color_dl, BGCOLOR_USED);
+		}
+		if($lim_bgcol < $seg_dllen) {
+			write_entry_no_sep(substr($seg_dl, $lim_bgcol),
+						$color_dl, BGCOLOR_FREE);
+		}
+		$lim_bgcol -= $seg_dllen;
+		if($lim_bgcol > 0) {
+			write_entry_no_sep(substr($seg_du, 0, $lim_bgcol),
+						$color_du, BGCOLOR_USED);
+			write_entry(substr($seg_du, $lim_bgcol),
+						$color_du, BGCOLOR_FREE);
+		} else {
+			write_entry($seg_du, $color_du, BGCOLOR_FREE);
+		}
+
+		#write_disk_stats_entry($stats, $disk->[2]);
+		# TODO z optionally do not display any gauge at all but rather
+		#        just a colon if space is insufficient...
+		#write_entry(.get_gauge_horiz($util_perc).
+		#			$usedgstr."/".$totalgstr,
+		#			);
+	}
+}
+
+sub get_disk_stats {
+	my ($stats, $dev) = @_;
+	my $ttreq = $stats->{$dev}->{ttreq};
+	my $ttbyt = $stats->{$dev}->{ttbyt};
+
+	my @units = ("B", "K", "M", "G", "T");
+	while($ttbyt > 1024 and $#units) {
+		$ttbyt /= 1024;
+		shift @units;
+	}
+
+	my $color = COLOR_NORM;
+	my $unit = shift @units;
+	if($unit eq "G" or $unit eq "T" or ($unit eq "M" and $ttbyt > 90) or
+							$ttreq > 10_000) {
+		$color = COLOR_CRIT;
+	} elsif(($unit eq "M" and $ttbyt > 10) or $ttreq > 500) {
+		$color = COLOR_WARN;
+	}
+
+	my $log = $ttreq >= 5? (log($ttreq) / log(10)): 0;
+	return (sprintf("[%1.0f%s]", $log, $unit), $color);
+}
+
+sub populate_disks_info {
+	my $disks = shift;
+	my %disk_devices = ();
+	my @all_fs = ();
+	open(my $fh, "/proc/mounts");
+	while(<$fh>) {
+		next unless $_ =~ /^\/dev\//;
+		my @fields = split(/\s+/);
+		push @all_fs, $fields[1];
+		$disk_devices{$fields[1]} = basename($fields[0]);
+	}
+	close($fh);
+	assign_names($disks, \@all_fs);
+	for(my $i = 0; $i <= $#all_fs; $i++) {
+		push @{$disks->[$i]}, $disk_devices{$disks->[$i]->[0]};
+	}
+}
+
+# $1 reference to output list
+# $2 reference to input list of names to consider
+sub assign_names {
+	my ($output_list, $all_in_ref) = @_;
+	my @all_in = @{$all_in_ref};
+	@all_in = sort @all_in;
+	my @intermediate_names = (@all_in);
+	# 1st pass
+	for(my $i = 0; $i <= $#all_in; $i++) {
+		my $iseq = ($i < $#all_in); # do not process last entry
+		while($iseq) {
+			my $chr = substr($intermediate_names[$i], 0, 1);
+			for(my $j = $i + 1; $j <= $#all_in; $j++) {
+				my $sch = substr($intermediate_names[$j], 0, 1);
+				if($sch ne $chr) {
+					$iseq = 0;
+					last;
+				}
+			}
+			if($iseq) {
+				for(my $j = $i; $j <= $#all_in; $j++)  {
+					$intermediate_names[$j] = substr(
+						$intermediate_names[$j], 1);
+				}
+			}
+		}
+	}
+	# 2nd pass
+	for(my $i = 0; $i <= $#all_in; $i++) {
+		my $str = $intermediate_names[$i];
+		my $len = length($str);
+		if($len == 0) {
+			$str = '/'
+		} elsif($len > 1) {
+			my $isprefix = 1;
+			my $numchars = 1;
+			while($numchars <= $len and $isprefix) {
+				$isprefix = 0;
+				my $potpre = substr($str, 0, $numchars);
+				my $prelen = length($potpre);
+				for(my $j = 0; $j <= $#all_in; $j++) {
+					next if($j == $i);
+					my $sublen = length(
+						$intermediate_names[$j]);
+					next if($sublen < $prelen);
+					if($potpre eq substr(
+							$intermediate_names[$j],
+							0, $prelen)) {
+						$isprefix = 1;
+						$numchars++;
+						last;
+					}
+				}
+			}
+			$str = substr($str, 0, $numchars);
+		}
+		push @{$output_list}, [$all_in[$i], $str];
+	}
+}
+
+# TODO z This slow command should best be invoked in a separate thread
+sub write_screenindex_block {
+	state $screenindex_has   = undef;
+	state $screenindex_bar   = undef;
+	state $screenindex_color = undef;
+
+	if(not(defined($screenindex_has))) {
+		$screenindex_has = defined(File::Which::which("screenindex"));
+	}
+	return if(not($screenindex_has));
+
+	my $perform_rare_tasks   = shift;
+
+	if(not(defined($screenindex_bar)) or $perform_rare_tasks) {
+		open my $fd, "-|", "screenindex -v d current -r";
+		my $perc;
+		while(<$fd>) {
+			$perc = $_;
+		}
+		close $fd;
+		$screenindex_bar = "SC ".get_gauge_horiz($perc);
+		$screenindex_color = color_by_threshold($perc, 80, 99);
+	}
+
+	write_entry($screenindex_bar, $screenindex_color);
+}
+
+sub get_gauge_horiz {
+	my $perc = shift;
+	return "██████████" if($perc >= 100);
+	return "█████████░" if($perc >=  90);
+	return "████████░░" if($perc >=  80);
+	return "███████░░░" if($perc >=  70);
+	return "██████░░░░" if($perc >=  60);
+	return "█████░░░░░" if($perc >=  50);
+	return "████░░░░░░" if($perc >=  40);
+	return "███░░░░░░░" if($perc >=  30);
+	return "██░░░░░░░░" if($perc >=  20);
+	return "█░░░░░░░░░" if($perc >=  10);
+	return "░░░░░░░░░░";
+}
+
+sub write_network_interfaces_block {
+	my ($perform_rare_tasks, $stats) = @_;
+
+	state @interfaces_state = ();
+
+	if($perform_rare_tasks) {
+		@interfaces_state = ();
+		my @interfaces = IO::Interface::Simple->interfaces;
+		my @interfaces_to_consider_in = ();
+		my %interfaces_info = ();
+		for my $if (@interfaces) {
+			next if $if->name =~ /^((vir)?br[0-9]|br-[0-9a-f]{12}|vnet[0-9]|veth[0-9a-f]{7}|docker0|lo)$/;
+			push @interfaces_to_consider_in, $if->name;
+			$interfaces_info{$if->name} = [$if->is_running,
+								$if->address];
+		}
+		assign_names(\@interfaces_state, \@interfaces_to_consider_in);
+		for(my $i = 0; $i <= $#interfaces_state; $i++) {
+			push @{$interfaces_state[$i]},
+				@{$interfaces_info{$interfaces_state[$i]->[0]}};
+		}
+	}
+
+	for(my $i = 0; $i <= $#interfaces_state; $i++) {
+		next unless $interfaces_state[$i]->[2];
+		my $txbyt = $stats->{$interfaces_state[$i]->[0]}->{txbyt};
+		my $rxbyt = $stats->{$interfaces_state[$i]->[0]}->{rxbyt};
+		my $alltransfer = ($rxbyt + $txbyt) / 1024 / 1024; # MiB/s
+		write_entry($interfaces_state[$i]->[1]." ".
+				$interfaces_state[$i]->[3]." ".
+				get_scaled_bytes($txbyt)."/".
+				get_scaled_bytes($rxbyt),
+				color_by_threshold($alltransfer, 1.2, 70));
+	}
+}
+
+sub get_scaled_bytes {
+	my $bytes = shift;
+	my @signs = ('K', 'M', 'G', 'T');
+	my $sign = 'B';
+	while($bytes > 999 and @signs) { # 999:  avoid more than three letters
+		$bytes /= 1024;          # 1024: display in KiB, MiB, GiB, TiB
+		$sign = shift(@signs);
+	}
+	return sprintf("%3.0f%s", $bytes, $sign);
+}
+
+sub write_acpi_battery_block {
+	my $perform_rare_tasks = shift;
+
+	state $acpi_output_text = undef;
+	state $acpi_output_color = COLOR_CRIT;
+
+	# get time remaining in hours the lightweight way:
+	# echo $(($(cat /sys/class/power_supply/BAT0/charge_now) /
+	#         $(cat /sys/class/power_supply/BAT0/current_now)))
+
+	if($perform_rare_tasks or not defined($acpi_output_text)) {
+		my $acpi = `LANG=C acpi || true`;
+		if($acpi eq "") {
+			# retry on next rare occasion
+			$acpi_output_text = "";
+			return;
+		}
+		$acpi =~ s/^.*: ([A-Z])[^,]+, ([0-9]+)%,? ?([^ ]+)?.*\n$/$1 $2 $3/g;
+		my @parts = split / /, $acpi;
+		return unless $#parts == 2; # sometimes acpi may return garbage
+		my $state = substr($parts[0], 0, 1);
+		my $perc  = $parts[1];
+		$system_is_on_ac = ($state eq "C" or $state eq "F");
+		$acpi_output_color = $system_is_on_ac?
+				COLOR_NORM: color_by_threshold($perc, 10, 40);
+		$acpi_output_text = $state." ".get_gauge_horiz($perc)." ".
+				$parts[2];
+	}
+
+	write_entry($acpi_output_text, $acpi_output_color)
+						if($acpi_output_text ne "");
+}
+
+sub write_ups_block {
+	state $ups_has = undef;
+	state $ups_output = undef;
+	state $ups_color = undef;
+
+	return if(defined($ups_has) and not $ups_has);
+
+	my $perform_rare_tasks = shift;
+	if($perform_rare_tasks) {
+		my $perc     = undef;
+		my $timeleft = undef;
+		my $socket = new IO::Socket::INET(PeerAddr => "127.0.0.1",
+					PeerPort => 3551, Proto => "tcp");
+
+		try {
+			syswrite($socket, "\000\006status");
+			$ups_has = 1;
+		} catch {
+			$ups_has = 0;
+		};
+
+		return if not $ups_has;
+
+		while(<$socket>) {
+			last if $_ =~ /END APC/;
+			my @fields = map { $_ =~ s/^\s+|\s+$//g; $_; } 
+							split(/: /);
+			$fields[0] =~ s/[^A-Z0-9]+//g;
+			my @subf = split(/ /, $fields[1]);
+			if($fields[0] eq "TIMELEFT") {
+				$timeleft = $subf[0];
+			} elsif($fields[0] eq "BCHARGE") {
+				$perc = $subf[0];
+			}
+			# allow terminating early
+			last if(defined($perc) and defined($timeleft));
+		}
+		close $socket;
+
+		$ups_output = "APC ".get_gauge_horiz($perc)." ".sprintf("%3.0f",
+								$timeleft)."m";
+		$ups_color = color_by_threshold(100 - $perc, 2, 50);
+	}
+
+	write_entry($ups_output, $ups_color) if(defined($ups_output));
+}
+
+sub write_loadavg_block {
+	my $stats = shift;
+	my $lavg = $stats->{avg_5}; # old status bar used avg_1
+	write_entry($lavg, color_by_threshold($lavg, 10.0, 100.0));
+}
+
+sub write_clock_block {
+	my $timestamp_ref = shift;
+	my ($tS, $tM, $tH, $td, $tm, $tY) = localtime($timestamp_ref->[0] +
+					$timestamp_ref->[1] / 1_000_000);
+	$tY += 1900;
+	$tm += 1;
+	# Clock is always WHITE
+	write_entry_no_sep(sprintf("%02d.%02d.%04d %02d:%02d:%02d",
+			$td, $tm, $tY, $tH, $tM, $tS), "#ffffff", BGCOLOR_NORM);
+}
+
+# Inlined for maximum simplicity. License is public domain so should be OK.
+# https://raw.githubusercontent.com/cota/cputopology-perl/master/CpuTopology.pm
+# License: Public domain via CC0 -- see LICENSE.
+# Contact: Emilio G. Cota cota@braap.org
+#----------------------------------------------[ BEGIN CpuTopology.pm Module ]--
+{
+	package CpuTopology;
+
+	use strict;
+	use warnings;
+	use Exporter qw(import);
+
+	our @EXPORT_OK = qw(
+		cpus
+		init
+		n_cores_per_socket
+		n_sockets
+		n_threads_per_core
+		threads_in_socket
+		sockets
+	);
+
+	my $sysfs_path = '/sys/devices/system/cpu';
+
+	my %sockets;
+	my @cpus;
+
+	sub read_param {
+	    my ($id, $param) = @_;
+	    my $val;
+
+	    my $filename = "$sysfs_path/cpu$id/topology/$param";
+	    open(INPUT, "<$filename") or die("Cannot open $filename: $!\n");
+	    while (<INPUT>) {
+		chomp;
+		if ($_ =~ /^([0-9]+)$/) {
+		    $val = $1;
+		} else {
+		    die ("Cannot interpret '$_' in $filename\n");
+		}
+	    }
+	    close(INPUT) or die("Cannot close $filename: $!\n");
+	    return $val;
+	}
+
+	sub get_cpus {
+	    opendir(my $dh, $sysfs_path) || die "can't opendir $sysfs_path: $!";
+	    my @array = grep { /^cpu[0-9]+$/ } readdir($dh);
+	    closedir $dh;
+
+	    foreach my $cpu (@array) {
+		$cpu =~ s/cpu//;
+	    }
+	    @cpus = sort { $a <=> $b } @array;
+
+	    if (@cpus == 0) {
+		die ("0 cpus seen -- is sysfs mounted on /sys? Are you on Linux?");
+	    }
+	}
+
+	# No need to call this function unless you have CPU hotplug, in which
+	# case by calling it you'll force a read of the topology.
+	sub init {
+	    get_cpus();
+	    my $sock;
+	    foreach my $id (@cpus) {
+		my $socket = read_param($id, 'physical_package_id');
+		my $core = read_param($id, 'core_id');
+		push @{ $sock->{$socket}->{$core} }, $id;
+	    }
+	    # clean up $sock, since socket/core id's might not be contiguous
+	    my $i = 0;
+	    foreach my $s (sort { $a <=> $b } keys %$sock) {
+		my $j = 0;
+		foreach my $c (sort { $a <=> $b } keys %{ $sock->{$s} }) {
+		    push @{ $sockets{$i}{$j} },
+	                 sort { $a <=> $b } @{ $sock->{$s}{$c} };
+		    $j++;
+		}
+		$i++;
+	    }
+	}
+
+	sub _init {
+	    if (@cpus and %sockets) {
+		return;
+	    }
+	    init();
+	}
+
+	sub cpus {
+	    _init();
+	    return @cpus;
+	}
+
+	sub n_cores_per_socket {
+	    _init();
+	    return scalar(keys %{ $sockets{0} });
+	}
+
+	sub n_sockets {
+	    _init();
+	    return scalar(keys %sockets);
+	}
+
+	sub n_threads_per_core {
+	    _init();
+	    return scalar(@{ $sockets{0}->{0} });
+	}
+
+	# Returns a list of threads in the same socket.
+	# $max_threads_per_core threads from each core in the socket are returned.
+	sub threads_in_socket {
+	    my ($socket, $max_threads_per_core) = @_;
+
+	    _init();
+	    die ("Socket $socket does not exist\n") if !$sockets{$socket};
+
+	    my $n = $max_threads_per_core;
+	    my $max_n = n_threads_per_core();
+	    if ($n > $max_n) {
+		warn "requested max_threads_per_core=$max_threads_per_core > ".
+	             "n_threads_per_core=$max_n: using $max_n\n";
+		$n = $max_n;
+	    }
+
+	    my @ret = ();
+	    foreach my $core (sort { $a <=> $b } keys %{ $sockets{$socket} }) {
+		for (my $i = 0; $i < $n; $i++) {
+		    my $thread_list = $sockets{$socket}->{$core};
+		    push @ret, $thread_list->[$i];
+		}
+	    }
+	    return @ret;
+	}
+
+	sub sockets {
+	    _init();
+	    return %sockets;
+	}
+}
+#----------------------------------------------[ END   CpuTopology.pm Module ]--
+
+CpuTopology->import();
+#use lib dirname(__FILE__); # load locally changed modules below...
+#require CpuTopology;
+
+main(@ARGV);

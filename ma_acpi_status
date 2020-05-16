@@ -1,0 +1,11 @@
+#!/bin/sh -e
+# Ma_Sys.ma ACPI Output Formatting Script 1.0.0, Copyright (c) 2015 Ma_Sys.ma.
+# For further info send an e-mail to Ma_Sys.ma@web.de.
+
+status="$(acpi | sed 's/^.*: \([A-Z]\)[^,]\+, \([0-9]\+\)%,\? \?\([^ ]\+\)\?.*$/\1 \2 \3/g')"
+
+letter="$(echo "$status" | cut -d" " -f 1)"
+perc="$(echo "$status" | cut -d" " -f 2)"
+time="$(echo "$status" | cut -d" " -f 3)"
+
+echo "$letter $(ma_perc_bar "$perc") $perc% $time"

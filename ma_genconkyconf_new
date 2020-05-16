@@ -1,0 +1,261 @@
+#!/bin/sh -e
+## Ma_Sys.ma Conky Configuration File Generator 2.0.23,
+## Copyright (c) 2015, 2016, 2017, 2018, 2019 Ma_Sys.ma.
+## For further info send an e-mail to Ma_Sys.ma@web.de.
+
+# WARNING: LEGACY CODE. THIS SCRIPT IS UNMAINTAINED AND HAS SOME
+#          MACHINE-SPECIFIC PARTS WHICH NEED TO BE CHANGED TO BE APPLICABLE ON
+#          OTHER PERSONS' SYSTEMS.
+
+#------------------------------------------------------------------[ General ]--
+
+head -n 4 "$0" | tail -n 3 | tr '#' '-'
+
+OUTPUT_MODE=JSON
+MGCC_SCREENINDEX=/usr/bin/screenindex
+
+# od -b /
+#f="$(printf "\342\226\210")" #e="$(printf "\342\226\221")"
+#v0="$(printf "\342\226\201")" #v1="$(printf "\342\226\202")"
+#v2="$(printf "\342\226\203")" #v3="$(printf "\342\226\204")"
+#v4="$(printf "\342\226\205")" #v5="$(printf "\342\226\206")"
+#v6="$(printf "\342\226\207")" #v7="$(printf "\342\226\208")"
+#v8="$(printf "\342\226\209")" #v9="$(printf "\342\226\210")"
+
+f=█; e=░; v1=▁; v2=▂; v3=▃; v4=▄; v5=▅; v6=▆; v7=▇; v8=█
+
+case "$1" in
+(-t) OUTPUT_MODE=TEXT;;
+(-j) OUTPUT_MODE=JSON;;
+(*) cat <<EOF
+
+USAGE $(basename "$0") [-t|-j]
+
+-t is for Text mode
+-j is for JSON
+EOF
+exit 1;;
+esac
+
+echo
+printf "%s\n%s" "-- Generated" "-- "
+date
+echo "conky.config = {"
+
+if [ "$OUTPUT_MODE" = JSON ]; then
+	cat <<EOF
+	out_to_console = true,
+	out_to_x = false,
+EOF
+else
+	cat <<EOF
+	alignment = 'top_left',
+	out_to_x = true,
+	own_window = true,
+	own_window_type = 'panel',
+	own_window_transparent = true,
+	double_buffer = true,
+	background = false,
+	font = '-*-terminus-medium-*-normal-*-12-*-*-*-*-*-iso10646-1',
+EOF
+fi
+
+cat <<EOF
+	if_up_strictness = 'address',
+	short_units = true,
+	update_interval = 1,
+	total_run_times = 0,
+	no_buffers = true,
+	use_spacer = 'right',
+	override_utf8_locale = true
+}
+
+conky.text = [[
+EOF
+
+#----------------------------------------------------------------[ Functions ]--
+
+# only generate horizontal bar w/ variable $1
+hbar10() {
+	printf '%s' "\${if_match $1 > 97}$f$f$f$f$f$f$f$f$f$f\$else\\
+\${if_match $1 > 90}$f$f$f$f$f$f$f$f$f$e\$else\\
+\${if_match $1 > 80}$f$f$f$f$f$f$f$f$e$e\$else\\
+\${if_match $1 > 70}$f$f$f$f$f$f$f$e$e$e\$else\\
+\${if_match $1 > 60}$f$f$f$f$f$f$e$e$e$e\$else\\
+\${if_match $1 > 50}$f$f$f$f$f$e$e$e$e$e\$else\\
+\${if_match $1 > 40}$f$f$f$f$e$e$e$e$e$e\$else\\
+\${if_match $1 > 30}$f$f$f$e$e$e$e$e$e$e\$else\\
+\${if_match $1 > 20}$f$f$e$e$e$e$e$e$e$e\$else\\
+\${if_match $1 > 10}$f$e$e$e$e$e$e$e$e$e\\
+\$else$e$e$e$e$e$e$e$e$e$e\$endif\$endif\$endif\$endif\$endif\$endif\$endif\\
+\$endif\$endif\$endif"
+}
+
+# only variable $1
+vbar() {
+	printf '%s' "\${if_match $1 > 88}$v8\$else\\
+\${if_match $1 > 75}$v7\$else\\
+\${if_match $1 > 63}$v6\$else\\
+\${if_match $1 > 50}$v5\$else\\
+\${if_match $1 > 38}$v4\$else\\
+\${if_match $1 > 25}$v3\$else\\
+\${if_match $1 > 12.5}$v2\$else$v1\$endif\$endif\$endif\$endif\$endif\$endif\\
+\$endif"
+}
+
+# $1: text, $2: color, $3 rest (JSON), $4 (more rest JSON)
+entry() {
+	if [ "$OUTPUT_MODE" = JSON ]; then
+		printf '{ "full_text":"%s", "color":"\#%s"%s}%s' "$@"
+	else
+		printf '${color %s}%s$color' "$2" "$1"
+		[ -z "$4" ] || printf ' '
+	fi
+}
+
+#-----------------------------------------------------------------[ Preamble ]--
+
+[ "$OUTPUT_MODE" = TEXT ] || printf '%s' '[ '
+
+entry '$nodename$if_gw (${if_match "$gw_iface" == "multiple"}multigwi$else${eval $${addr ${gw_iface}}}$endif)$endif' 777777 "" ,
+
+#---------------------------------------------------------------------[ CPUs ]--
+
+entry "$(hbar10 '${cpu cpu0}')" aa0000 "" ,
+
+cpu_individuals=""
+
+cpus=$(grep -E "^$" /proc/cpuinfo | wc -l)
+cpus_real=$(grep -E "^cpu cores\s+: [0-9]+$" /proc/cpuinfo | head -n 1 | \
+								cut -d ":" -f 2)
+hyper_threading=null
+if [ "$cpus" -gt "$cpus_real" ]; then
+	hyper_threading=true
+	MGCC_N_HYPER_THREADING=$(($cpus / $cpus_real))
+else
+	hyper_threading=false
+fi
+i=1
+while [ "$i" -le "$cpus" ]; do
+	if [ -n "$cpu_individuals" ]; then
+		cpu_individuals="$cpu_individuals $(vbar "\${cpu cpu$i}")"
+	else
+		cpu_individuals="$(vbar "\${cpu cpu$i}")"
+	fi
+	if $hyper_threading; then
+		i=$(($i + 1))
+		cpu_individuals="$cpu_individuals$(vbar "\${cpu cpu$i}")"
+	fi
+	i=$(($i + 1))
+done
+
+entry "$cpu_individuals" aa0000 "" ,
+
+#----------------------------------------------------------------[ RAM, HDDs ]--
+
+entry "$(hbar10 '$memperc')" 00aa00 "" ,
+entry "$(hbar10 '$swapperc')" 00aaaa "" ,
+
+entry "$(hbar10 '${fs_used_perc /}')" 5555cc "" ,
+
+[ ! -d /data/main ] || entry "D $(hbar10 '${fs_used_perc /data/main}')" \
+								5555cc "" ,
+[ ! -d /fs/ll ]     || entry "L $(hbar10 '${fs_used_perc /fs/ll}')" \
+								5555cc "" ,
+[ ! -d /fs/e01 ]    || entry "E $(hbar10 '${fs_used_perc /fs/e01}')" \
+								5555cc "" ,
+
+#printf "%s" '${if_updatenr 180}${lua invoc_screenindex}$endif'
+#entry "$(hbar10 '${lua get_screenindex}')" 777777 "" ,
+
+[ ! -x "$MGCC_SCREENINDEX" ] || entry \
+			'${texeci 180 ma_perc_bar "$('"$MGCC_SCREENINDEX"' \
+			-v d current -r | tail -n 1)"}' 777777 "" ,
+
+#--------------------------------------------------------[ Hardware monitors ]--
+
+# Ma_Sys.ma 3 Temperature
+if [ -e /sys/bus/platform/devices/coretemp.0/hwmon/hwmon0/temp2_input ]; then
+	phw="platform coretemp.0/hwmon/hwmon0 temp"
+	entry "T \${$phw 2} \${$phw 3} \${$phw 4} \${$phw 5}" aa0000 "" ,
+fi
+
+# PTE5 Temperature
+if [ -e /sys/bus/platform/devices/coretemp.0/hwmon/hwmon1/temp4_input ]; then
+	phw="platform coretemp.0/hwmon/hwmon1 temp"
+	entry "T \${$phw 1} \${$phw 2} \${$phw 3} \${$phw 4}" aa0000 "" ,
+fi
+
+# Ma_Sys.ma 9 temperature
+if [ -e /sys/bus/platform/devices/coretemp.0/hwmon/hwmon2/temp1_input ]; then
+	phw="platform coretemp.0/hwmon/hwmon2 temp"
+	entry "T \${$phw 1}" aa0000 "" ,
+fi
+
+# Ma_Sys.ma 3 Fan speeds
+if [ -e /sys/bus/platform/devices/smsc47b397.1152/hwmon/hwmon1 ]; then
+	phw="platform smsc47b397.1152/hwmon/hwmon1 fan"
+	# FRONT, MID, BACK
+	entry "FAN \${$phw 3} \${$phw 4} \${$phw 1}" a0000 "" ,
+fi
+
+#------------------------------------------------------------------[ Network ]--
+
+mknentrys() {
+	printf '${totalup %s}/${totaldown %s}' "$1" "$1"
+}
+
+# workaround bug that gw-related commands may only appear once...
+
+# ALT printf "%s" '${if_match "$gw_iface" == "none"}${else}'
+# ALT printf "%s" '${if_match "$gw_iface" == "multiple"}${else}'
+# ALT entry '${eval $${upspeed ${gw_iface}}/$${downspeed ${gw_iface}}}' aa0070 "" ,
+# ALT printf "%s" '${endif}${endif}'
+
+default_dev="$(ip route list default | \
+	sed -n 's/default via [0-9a-f.:]\+ dev \([a-z0-9]\+\)[a-z ]*$/\1/p')"
+if [ -n "$default_dev" ]; then
+	printf '${if_up %s}' "$default_dev"
+	entry "\${upspeed $default_dev}/\${downspeed $default_dev}" aa0070 "" ,
+	printf '$endif'
+fi
+
+for i in /sys/class/net/*; do
+	in="$(basename "$i")"
+	# aligned w/ /usr/bin/syssheet
+	if echo "$in" | grep -qE '^((vir)?br[0-9]|br-[0-9a-f]{12}|vnet[0-9]|veth[0-9a-f]{7}|docker0|lo$)'; then
+		continue
+	fi
+	sn="$(printf "%s" "$in" | tail -c 2)"
+	printf '${if_up %s}' "$in"
+	entry "$sn $(mknentrys "$in")" aa0070 "" ,
+	printf '$endif'
+done
+
+printf '${if_up wlan0}'
+entry "W $(mknentrys wlan0) \${wireless_essid wlan0} $(hbar10 \
+				'${wireless_link_qual_perc wlan0}')" aa0070 "" ,
+printf '$endif'
+
+#----------------------------------------------------------[ Battery Related ]--
+
+# Ma_Sys.ma 3 UPS
+if ps -Aao "comm" | grep -qF apcupsd; then
+	epr='${apcupsd 127.0.0.1 3551}${apcupsd_model}'
+	epo='${apcupsd_timeleft}m'
+	entry "$epr$(hbar10 '${apcupsd_charge}') $epo" cc9000 "" ,
+fi
+
+# Laptop
+if [ -d /proc/acpi/button/lid ]; then
+	entry "\${texeci 60 ma_acpi_status}" cc9000 "" ,
+fi
+
+#---------------------------------------------------------[ Loadavg and Time ]--
+
+entry '${loadavg 1}' aa0000 "" ,
+entry '${time %d.%m.%Y %02k:%M:%S}' ffffff
+
+[ "$OUTPUT_MODE" = TEXT ] || echo " ],"
+
+echo "]]"

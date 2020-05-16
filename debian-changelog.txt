@@ -1,0 +1,5 @@
+mdvl-i3bar (1.0.0) stable; urgency=medium
+
+  * Package created with MDPC 2
+
+ -- Linux-Fan, Ma_Sys.ma <Ma_Sys.ma@web.de>  Sun, 17 May 2020 01:31:11 +0200

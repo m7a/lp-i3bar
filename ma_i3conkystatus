@@ -1,0 +1,27 @@
+#!/bin/sh -e
+# Ma_Sys.ma i3 Conky Status Helper Script 1.0.1
+# Copyright (c) 2015, 2019 Ma_Sys.ma.
+# For further info send an e-mail to Ma_Sys.ma@web.de.
+
+[ -f "$HOME/.mdvl/conkyrc_i3" ] || ma_genconkyconf_new -j \
+						> "$HOME/.mdvl/conkyrc_i3"
+
+cat <<EOF
+{"version":1}
+[
+EOF
+
+# Hack to fix laptop issues: At the begin we run conky a few times "`restricted"'
+#if [ -d /proc/acpi/button/lid ]; then
+#	conky -i 60 -qc "$HOME/.mdvl/conkyrc_i3" | \
+#		grep -E '^\[[-0-9A-Za-z._: |,{}#/█░▁▂▃▄▅▆▇█"%]+\],$' || true
+#fi 
+
+rv=0
+while sleep 2; do
+	conky -qc "$HOME/.mdvl/conkyrc_i3" 2> /dev/null || rv="$?"
+	case "$rv" in
+	(134|139) :;;
+	(*)       exit "$rv";;
+	esac
+done

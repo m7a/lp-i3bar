@@ -1,0 +1,41 @@
+#!/bin/sh -e
+# Ma_Sys.ma Percentage Bar Script 1.0.1, Copyright (c) 2015, 2016 Ma_Sys.ma.
+# For further info send an e-mail to Ma_Sys.ma@web.de.
+
+if [ $# = 0 -o "$1" = "--help" ]; then
+	head -n 3 "$0" | tail -n 2 | cut -c 3-
+	echo
+	echo USAGE $0 percentage
+	exit 1
+fi
+
+f=█
+e=░
+perc="$1"
+bar=
+
+if [ "$perc" -ge 100 ]; then
+	bar="$f$f$f$f$f$f$f$f$f$f"
+elif [ "$perc" -ge 90 ]; then
+	bar="$f$f$f$f$f$f$f$f$f$e"
+elif [ "$perc" -ge 80 ]; then
+	bar="$f$f$f$f$f$f$f$f$e$e"
+elif [ "$perc" -ge 70 ]; then
+	bar="$f$f$f$f$f$f$f$e$e$e"
+elif [ "$perc" -ge 60 ]; then
+	bar="$f$f$f$f$f$f$e$e$e$e"
+elif [ "$perc" -ge 50 ]; then
+	bar="$f$f$f$f$f$e$e$e$e$e"
+elif [ "$perc" -ge 40 ]; then
+	bar="$f$f$f$f$e$e$e$e$e$e"
+elif [ "$perc" -ge 30 ]; then
+	bar="$f$f$f$e$e$e$e$e$e$e"
+elif [ "$perc" -ge 20 ]; then
+	bar="$f$f$e$e$e$e$e$e$e$e"
+elif [ "$perc" -ge 10 ]; then
+	bar="$f$e$e$e$e$e$e$e$e$e"
+else
+	bar="$e$e$e$e$e$e$e$e$e$e"
+fi
+
+echo "$bar"
