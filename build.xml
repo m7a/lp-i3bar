@@ -6,7 +6,7 @@
 <property name="mdpc.section"    value="x11"/>
 <property name="mdpc.descrs"     value="Scripts for populating i3bar status (with conky or without)"/>
 <property name="mdpc.arch"       value="all"/>
-<property name="mdpc.depends"    value="i3-wm"/>
+<property name="mdpc.depends"    value="i3-wm, ${perl:Depends}"/>
 <property name="mdpc.suggests"   value="conky"/>
 <property name="mdpc.conflicts"  value="mdvl-scripts (&lt;= 1.0.372), mdvl-conf-gui (&lt;= 1.0.0)"/>
 <property name="mdpc.recommends" value="mdvl-screenindex"/>

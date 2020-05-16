@@ -1,3 +1,9 @@
+mdvl-i3bar (1.0.1) stable; urgency=medium
+
+  * Add missing perl dependencies.
+
+ -- Linux-Fan, Ma_Sys.ma <Ma_Sys.ma@web.de>  Sun, 17 May 2020 01:41:39 +0200
+
 mdvl-i3bar (1.0.0) stable; urgency=medium
 
   * Package created with MDPC 2
