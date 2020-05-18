@@ -1,0 +1,238 @@
+---
+section: 32
+x-masysma-name: i3bar
+title: Ma_Sys.ma i3bar Scripts
+date: 2020/05/18 23:44:10
+lang: en-US
+author: ["Linux-Fan, Ma_Sys.ma (Ma_Sys.ma@web.de)"]
+keywords: ["i3", "i3bar", "mdvl", "package", "perl", "monitoring"]
+x-masysma-version: 1.0.0
+x-masysma-repository: https://www.github.com/m7a/lp-i3bar
+x-masysma-website: https://masysma.lima-city.de/32/i3bar.xhtml
+x-masysma-owned: 1
+x-masysma-copyright: |
+  Copyright (c) 2020 Ma_Sys.ma.
+  For further info send an e-mail to Ma_Sys.ma@web.de.
+---
+Summary
+=======
+
+This repository contains a collection of different scripts for configuring a
+_status bar_. The most recent script version works in combination with
+[i3bar(1)](https://manpages.debian.org/stable/i3-wm/i3bar.1), older versions
+work with [conky(1)](https://manpages.debian.org/stable/conky-all/conky.1).
+
+The installable Debian package can be created by running `ant package`.
+
+Introduction
+============
+
+A _status bar_ can be used to display system information. Usually, date and time
+information is provided along with other information the user may consider
+useful.
+
+For example, some people display the state of multimedia applications, others
+display network information like IP addresses and hostnames and some like to
+have a permanent glance at the system's load in terms of disk usage, processor
+load, memory etc.
+
+Background
+==========
+
+Programs like [conky(1)](https://manpages.debian.org/stable/conky-all/conky.1)
+and [i3status(1)](https://manpages.debian.org/stable/i3status/i3status.1) exist
+to aid in solving this task, but require extensive and often machine-dependent
+configuration. The necessity for configuration is natural, as the design and
+rationale behind a good status bar seems to be a very personal thing.
+
+However, being machine-dependent is not really a “nice” property for people who
+know their personal status bar style but want to use their configuration across
+many systems. In these cases one either has to edit the configuration for every
+system or come up with some kind of automation.
+
+This repository provides exactly that: Some examples of more or less advanced
+automated status bar “creation“ for a single user's personal configuration
+style. As a result, it is most unlikely that anybody will use the provided
+scripts or status bar directly, but it may serve as an inspiration of how to
+go about it. Additionally, for the most recent version, the reasons for
+including specific figures in the status bar output are explained with the
+expectation that this may serve a user who wants to thoughtfully craft their
+own status bar.
+
+Auxiliary Scripts
+=================
+
+On the way towards creating a status bar, one may be tempted to create scripts
+to simplify processing some status information. Beware that calling external
+processes from status bars can be resource-intensive.
+
+That warning given, here are two scripts which may be useful in other contexts
+than status bars, too:
+
+## `ma_perc_bar` -- progress bar
+
+Script `ma_perc_bar` is the absolute minimum of a status-bar script. It takes
+as input a number from 0 to 100 (both inclusive) and outputs a progress bar
+made of block characters.
+
+Example:
+
+~~~
+$ ./ma_perc_bar 30
+███░░░░░░░
+~~~
+
+The idea here is that the script may be used in rarely-called status scripts
+or may serve as a building block for conky configuration generation scripts
+(see section `ma_genconkyconf_new`)
+
+## `ma_acpi_status` -- formatted ACPI output
+
+Uses `ma_perc_bar` to format the output of the `acpi` command. This is
+intended to be called rarely (e. g. once per minute) to output Laptop battery
+status information as part of a possibly larger status bar.
+
+Example:
+
+	(TODO NEED A LAPTOP FOR THAT)
+
+The Legacy
+==========
+
+The Ma_Sys.ma journey through status bars was roughly like this:
+
+ * XFCE (3?) integrated status bar -- little is known about this, because it
+   was a long time (say more than 10 years as of this writing) ago. That time,
+   mostly disk usage was checked
+ * Standalone conky. Initially a hand-crafted configuration file and soon a
+   script to generate a configuration file dependent on the presence of
+   certain file systems and information on different machines. There was only
+   one script this way, but a few machine-specific lines here and there.
+   See section `xond/ma_genconkyconf`.
+ * Conky and i3bar. For integration with the i3 window manager, it turned out
+   to be nice using the i3bar e.g. as to display and be able to change the
+   different workspaces etc. Integration with i3bar is either text only or
+   colorized text by using a JSON interface. `ma_genconkyconf_new` used
+   this approach to generate a conky configuration which could be used in
+   combination with wrapper script `ma_i3conkystatus` to output a colorized
+   status bar in i3bar.
+ * `mai3bar` and i3bar. This (new!) variant is the first not to contain
+   strictly machine-specific code and also the first for a long time to not
+   rely on conky for gathering system information. See section
+   _Current Ma_Sys.ma i3bar_ for details.
+
+## `xond/ma_genconkyconf`
+
+The script in `xond/ma_genconkyconf` contains instructions to generate a status
+bar for standalone Conky usage which used to look like this:
+
+![Standalone conky with old configuration as generated by `xond/ma_genconkyconf`](i3bar_att/conky_old.png)
+
+Back then, conky had a different configuration file format which means that by
+now, the script is no longer compatible with new Conky versions and hence only
+of historic interest.
+
+The following items were in the status bar.
+
+### First row
+
+ * CPU information in red. The first gauge displays the overall CPU load and
+   the followup gauges display the individual processor cores. The script was
+   intended to distinguish different physical processor cores by leaving a
+   little space. In the example screenshot, it displays four physical cores
+   (because it is running in a virtual machine, it cannot know that it only
+   has e.g. two physical cores).
+ * Screenindex information in gray. The SCR gauge visualizes the output of
+   `screenindex -v d current -r`, see [screeninde(32)](screenindex.xhtml) for
+   details.
+ * Red text which may contain CPU temperature information if detected, inside
+   the VM that is just `N_SUPPORT` to indicate _not supported_.
+ * The system load averages
+ * The current date and time in `dd.MM.YYYY HH:mm:ss` format.
+
+### Second row
+
+ * RAM usage in green.
+ * Swap usage in cyan (SWP).
+ * Disk usage in blue (SYS). The script considers some specific Ma_Sys.ma
+   mountpoints to display as additional gauges here, if they are present.
+   By default, however, it only shows the disk usage of the root filesystem.
+ * Network information across all interfaces from left to right:
+   total data uploaded, total data downloaded, current upload speed,
+   current download speed (yes, the VM was downloading from local network
+   with 95.4 MiB/s!)
+
+### Evaluation
+
+Most of the information selected for being displayed back then, is still
+considered interesting in the most recent Ma_Sys.ma status bar versions.
+However, some measures have been taken to reduce the space occupied for
+things which may not require large gauges. Today, you can really see that
+the design from `xond/ma_genconkyconf` was not intended to display more than
+four or eight cores.
+
+Standalone conky works well for stacking window managers. Back then, Fluxbox
+was being used, but others are expected to work, too. For tiling window
+managers, there was often need for additional configuration, but at least i3
+and spectrwm allow for conky to be used as a “standalone” status bar.
+
+## `ma_genconkyconf_new`
+
+For about five years, this was the prevalent status bar used at the Ma_Sys.ma.
+It ran on a few physical as well as virtual machines and supported
+energy-efficient laptop as well as desktop usage.
+
+![Conky running as a child process of i3bar to render the status bar, configuration generated by `ma_genconkyconf_new -j`](i3bar_att/conky_new.png)
+
+To use screen space efficiently, this status bar uses only a single line.
+In terms of colors, it closely resembles its predecessor. The following
+information is displayed:
+
+ * System hostname (recent versions like the one included in the repository
+   also included the IP address)
+ * red CPU load gauge for all cores together
+ * red indivudal tiny vertical CPU load gauges for each individual core.
+   Like before, some automation to detect Hyperthreading etc. is part of the
+   script to generate the configuration file.
+ * green RAM gauge (displays as empty in the example, because the VM has much
+   more RAM assigned than used)
+ * cyan Swap gauge
+ * grey Screenindex gauge
+ * Magenta network information. The first (unlabelled) entry displays the
+   current upload/download activity. The other (potentially multiple) entries
+   display the totally uploaded and downloaded data by interface. The leading
+   `0` indicates that the interface's name ends on 0 (e. g. `eth0`).
+ * One-Minute Load average indicator
+ * Local time
+
+Some system-specific code allows special file systems to appear as additional
+gauges. Automatic detection of the `apcupsd` daemon or the use on a Laptop
+allow for battery monitoring gauges to appear on those systems, where they
+make sense.
+
+The configuration format is already conky's new format such that script
+`ma_genconkyconf_new` may still be used if one wants to create a similar
+status bar.
+
+The disadvantage of the integrateion with i3bar is complexity: To generate the
+JSON output needed by i3bar, a very convoluted Conky configuration file is
+generated and one cannot run conky directly from i3bar -- a wrapper script for
+displaying a leading `{"version:1"}[` string is needed. Additionally, conky
+occasionally crashed when network interfaces were changing or ACPI information
+was garbled.
+
+### Other noteworthy features
+
+ * Script `ma_genconkyconf_new` can be used in conjunction with a standalone
+   conky if called with the `-t` option instead of `-j`.
+ * Temperature information is displayed if detected (some potential sensors
+   for Ma_Sys.ma computers are hard-coded in the script...)
+
+## `ma_i3conkystatus`
+
+TODO CSTAT HOW TO USE AND INTEGRATE `ma_genconkyconf_new`.
+
+Current Ma_Sys.ma i3bar
+=======================
+
+...
