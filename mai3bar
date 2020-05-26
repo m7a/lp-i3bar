@@ -5,6 +5,8 @@
 # This code incoporates an external module under different copyright, see
 # section "BEGIN CpuTopology.pm Module"
 
+# TODO BUG: Hot-adding a network interface crashes the status bar.
+
 use 5.010;
 use strict;
 use warnings FATAL => 'all';

@@ -5,7 +5,7 @@ title: Ma_Sys.ma i3bar Scripts
 date: 2020/05/18 23:44:10
 lang: en-US
 author: ["Linux-Fan, Ma_Sys.ma (Ma_Sys.ma@web.de)"]
-keywords: ["i3", "i3bar", "mdvl", "package", "perl", "monitoring"]
+keywords: ["i3", "i3bar", "mdvl", "package", "perl", "monitoring", "statusbar"]
 x-masysma-version: 1.0.0
 x-masysma-repository: https://www.github.com/m7a/lp-i3bar
 x-masysma-website: https://masysma.lima-city.de/32/i3bar.xhtml
@@ -169,7 +169,7 @@ considered interesting in the most recent Ma_Sys.ma status bar versions.
 However, some measures have been taken to reduce the space occupied for
 things which may not require large gauges. Today, you can really see that
 the design from `xond/ma_genconkyconf` was not intended to display more than
-four or eight cores.
+four or eight processor cores.
 
 Standalone conky works well for stacking window managers. Back then, Fluxbox
 was being used, but others are expected to work, too. For tiling window
@@ -230,9 +230,91 @@ was garbled.
 
 ## `ma_i3conkystatus`
 
-TODO CSTAT HOW TO USE AND INTEGRATE `ma_genconkyconf_new`.
+In case you are interested in running `ma_genconkyconf_new` in conjunction with
+i3bar, the steps are as follows:
+
+ 1. Generate a Conky configuration file:
+    `ma_genconkyconf_new -j > ~/.mdvl/conkyrc_i3`
+ 2. Configure to use `ma_i3conkystatus` in i3. This script in turn invokes
+    `conky` with the configuration file generated in the previous step and
+    produces the static part of the necessary output for i3bar integration.
+    Additionally, in case of conky crashes, it attempts to re-start conky
+    without leaving i3bar in an error state.
+ 3. Restart/Reload i3 for the changes to take effect.
+
+Here is an example of an i3 configuration file snippet to invoke
+`ma_i3conkystatus`.
+
+	bar {
+		status_command /usr/bin/ma_i3conkystatus
+		position top
+		tray_output primary
+		colors {
+			#                   border  bg      fg
+			focused_workspace   #cc4040 #cc4040 #ffffff
+			active_workspace    #806060 #806060 #aaaaaa
+			inactive_workspace  #201818 #201818 #505050
+			urgent_workspace    #ffaa00 #ffaa00 #ffffff
+			background                  #000000
+			statusline                          #ffffff
+			separator                           #333333
+		}
+	}
 
 Current Ma_Sys.ma i3bar
 =======================
 
-...
+The current Ma_Sys.ma status bar is no longer dependent on conky. Instead, it
+is a Perl script which directly outputs JSON that can be processed by i3bar.
+Most notable change compared to the previous variants is the use of less colors:
+Instead of coloring different ressource types differntly, `mai3bar` colors
+resources depending on whether they can be considered to be in a critical,
+warning or normal state. This is intended to have the following advantages:
+
+ * Draw less attention to the status bar as to focus more on the actual
+   problems at hand.
+ * Use less space for less important metrics (e.\,g. CPU and RAM) but draw
+   attention to them if they are critical by means of color.
+
+Additionally, no longer using conky, it becomes feasible to implement gauges
+which have text written _on_ them. This allows for higher density in
+information. Additionally, actual _figures_ can be presented for resources
+like disk space and RAM. While it might seem a minor detail, having these values
+as numbers is useful in the context of virtual and old machines where limits
+might be very low e.\,g. for RAM or disk space compared to what one expects from
+modern physical systems.
+
+Here are a few other newly added features compared to the previous status bars
+used at the Ma_Sys.ma. A few of them are somewhat experimental because they may
+not fit the common expectations of how values would appear in a status bar:
+
+ * The CPU load gauges' layout provides more advanced CPU topology information
+   as detected by an integrated copy of Perl package `CpuTopology`.
+ * IOPS and Throughput figures for disks are displayed in a single-letter-format
+   each: The order of magnitude for IOPS is shown as lg(IOPS) rounded to the
+   nearest integer. The order of magnitude of a device's accumulated throughput
+   is displayed in B/K/M/G to indicate bytes, kilobytes, megabytes or gigabytes
+   respectively. The idea of these figures is to identify IO-heavy loads for
+   which some other system monitors show the system as mainly idle despite some
+   important tasks going on.
+ * Automatic choice of units for displayed metrics: For storage and RAM, current
+   systems may have a wide range from a few gigabytes to terabytes. As a result,
+   there does not seem to be a one size fits all unit of measure and hence, the
+   status bar automatically chooses between megabytes and gigabytes for RAM and
+   file systems. On systems with little RAM (e.g. 4 GiB), RAM is displayed
+   in megabytes, whereas on systems with much RAM (e.g. 16 GiB), RAM is
+   displayed in GiB. As there is currently no explicit indicator for which
+   unit is being used, there is some potential for confusion here and new
+   status bar versions might add a (potentially indirect) indicator for the
+   unit of measure.
+ * To give compact (e.g. one or two letter) names to file systems and network
+   interfaces, a special _name shortening algorithm_ is integrated.
+ * The refresh interval of the status bar uses different (hard-coded) delays
+   depending on the situation:
+   If a discharging laptop battery is detected, the refresh rate is once every
+   20 sec. Under regular circumstances, the refresh rate is once per second and
+   it may slow down if slow processing is noticed (as not to give too many of
+   the scarce resources to status bar computation).
+ * The refresh interval of the status bar is attempted to be aligned to the
+   actual turning of seconds such that the clock is expected to be more accurate
+   than with other status bars.
