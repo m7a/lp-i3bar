@@ -13,10 +13,8 @@
 <property name="mdpc.descrl">
  Provides multiple scripts to generate system status bars. The most recent
  variant: `mai3bar` generates contents to display in i3bar independently of
- other system monitors. Scripts `ma_genconkyconf` and `ma_genconkyconf` are
- (deprecated) attempts to generate suitable configuration for the conky
- system monitor. Only `ma_genconkyconf_new` integrates with i3bar and outputs
- configuration suitable for new conky versions.
+ other system monitors. Script `ma_genconkyconf_new` is a (deprecated) attempt
+ to generate suitable configuration for the conky system monitor..
  .
  Auxiliary scripts `ma_acpi_status` and `ma_perc_bar` allow nice formatting of
  ACPI and percentage information.
