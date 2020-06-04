@@ -1,54 +1,55 @@
 #!/usr/bin/perl
-# Ma_Sys.ma i3bar Script 1.0.1, Copyright (c) 2020 Ma_Sys.ma.
+# Ma_Sys.ma i3bar Script 1.0.2, Copyright (c) 2020 Ma_Sys.ma.
 # For further info send an e-mail to Ma_Sys.ma@web.de.
 
 # This code incoporates an external module under different copyright, see
 # section "BEGIN CpuTopology.pm Module"
 
-# TODO TEST BUG: Hot-adding a network interface crashes the status bar.
-# TODO TEST BUG: CPU load displayed wrongly in case of io: iowait is more similar to idle than load!
-# TODO TEST BUG: Hot-adding a filesystem and hot-removing a filesystme crashes the status bar.
-
-use 5.010;
-use strict;
-use warnings FATAL => 'all';
-use autodie;
+use     5.010;
+use     strict;
+use     warnings FATAL => 'all';
+use     autodie;
 
 require List::Util;
 require Sys::Statistics::Linux; # libsys-statistics-linux-perl
-require Filesys::Df; # libfilesys-df-perl
+require Filesys::Df;            # libfilesys-df-perl
 require Time::HiRes;
 require IO::Socket;
-require IO::Interface::Simple; # libio-interface-perl
-require File::Which; # libfile-which-perl
-#require Linux::MemInfo; # libsys-meminfo-perl
-use Try::Tiny;
-use File::Basename;
-use Data::Dumper 'Dumper'; # debug only
+require IO::Interface::Simple;  # libio-interface-perl
+require File::Which;            # libfile-which-perl
 
-use constant COLOR_NORM => "#eeeeee";
-use constant COLOR_WARN => "#ffff00";
-use constant COLOR_CRIT => "#ff0000";
+use     Try::Tiny;
+use     File::Basename;
 
+#use Data::Dumper 'Dumper'; # debug only
+
+use constant COLOR_NORM   => "#eeeeee";
+use constant COLOR_WARN   => "#ffff00";
+use constant COLOR_CRIT   => "#ff0000";
 use constant BGCOLOR_NORM => "#000000";
 use constant BGCOLOR_USED => "#005050";
 use constant BGCOLOR_FREE => "#003030";
-
-use constant I3_STAPLES => ",\"separator\":false,\"separator_block_width\":0";
+use constant I3_STAPLES   => ",\"separator\":false,\"separator_block_width\":0";
 
 my $use_json;
-my $is_first_entry = 0;
-my $system_is_on_ac = 1;
+my $is_first_entry         = 0;
+my $system_is_on_ac        = 1;
+my $perform_rare_tasks_now = 0;
+
+sub handle_sigusr_1 {
+	$SIG{USR1} = \&handle_sigusr_1;
+	$perform_rare_tasks_now = 1;
+}
 
 sub main {
 	$use_json = ($#_ == 0 and $_[0] eq "--json");
 
 	my $lxs = Sys::Statistics::Linux->new(
-		sysinfo  => 1,
-		cpustats => 1,
-		memstats => 1,
-		loadavg  => 1,
-		netstats => 1,
+		sysinfo   => 1,
+		cpustats  => 1,
+		memstats  => 1,
+		loadavg   => 1,
+		netstats  => 1,
 		diskstats => 1,
 	);
 	$lxs->init;
@@ -56,6 +57,8 @@ sub main {
 	if($use_json) {
 		print "{\"version\":1}\n[\n";
 	}
+
+	$SIG{USR1} = \&handle_sigusr_1;
 
 	my @next_rare_task = Time::HiRes::gettimeofday();
 	my @timestamp = Time::HiRes::gettimeofday(); # seconds, microseconds
@@ -81,10 +84,13 @@ sub main {
 		}
 
 		my $perform_rare_tasks = (
-					($timestamp[0] > $next_rare_task[0]) or
-					($timestamp[0] == $next_rare_task[0] and
-					$timestamp[1] > $next_rare_task[1]));
+			($timestamp[0] > $next_rare_task[0]) or
+			($perform_rare_tasks_now) or
+			($timestamp[0] == $next_rare_task[0] and
+			 $timestamp[1] > $next_rare_task[1])
+		);
 		if($perform_rare_tasks) {
+			$perform_rare_tasks_now = 0;
 			@next_rare_task = ($timestamp[0] +
 				$rare_task_interval_secs, $timestamp[1]);
 		}
@@ -356,13 +362,6 @@ sub write_disk_block {
 		} else {
 			write_entry($seg_du, $color_du, BGCOLOR_FREE);
 		}
-
-		#write_disk_stats_entry($stats, $disk->[2]);
-		# TODO z optionally do not display any gauge at all but rather
-		#        just a colon if space is insufficient...
-		#write_entry(.get_gauge_horiz($util_perc).
-		#			$usedgstr."/".$totalgstr,
-		#			);
 	}
 }
 
@@ -535,16 +534,29 @@ sub write_network_interfaces_block {
 	}
 
 	for(my $i = 0; $i <= $#interfaces_state; $i++) {
-		next if (not($interfaces_state[$i]->[2]) or
-			 not(defined($stats->{$interfaces_state[$i]->[0]})));
-		my $txbyt = $stats->{$interfaces_state[$i]->[0]}->{txbyt};
-		my $rxbyt = $stats->{$interfaces_state[$i]->[0]}->{rxbyt};
-		my $alltransfer = ($rxbyt + $txbyt) / 1024 / 1024; # MiB/s
-		write_entry($interfaces_state[$i]->[1]." ".
+		next unless($interfaces_state[$i]->[2]);
+		if(defined($stats->{$interfaces_state[$i]->[0]})) {
+			my $txbyt = $stats->{$interfaces_state[$i]->[0]
+								}->{txbyt};
+			my $rxbyt = $stats->{$interfaces_state[$i]->[0]
+								}->{rxbyt};
+			# MiB/s
+			my $alltransfer = ($rxbyt + $txbyt) / 1024 / 1024;
+			write_entry($interfaces_state[$i]->[1]." ".
 				$interfaces_state[$i]->[3]." ".
 				get_scaled_bytes($txbyt)."/".
 				get_scaled_bytes($rxbyt),
 				color_by_threshold($alltransfer, 1.2, 70));
+		} else {
+			# Fallback if newly added network interface is detected.
+			# Does not provide the stats but at lest the IP addr.
+			# Might one day report this as a bug for
+			# the Sys::Statistics::Linux::NetStats that
+			# hot-swapped interfaces are not added/removed properly.
+			write_entry($interfaces_state[$i]->[1]." ".
+					$interfaces_state[$i]->[3]." [nostats]",
+					COLOR_CRIT);
+		}
 	}
 }
 
@@ -570,7 +582,7 @@ sub write_acpi_battery_block {
 	#         $(cat /sys/class/power_supply/BAT0/current_now)))
 
 	if($perform_rare_tasks or not defined($acpi_output_text)) {
-		my $acpi = `LANG=C acpi || true`;
+		my $acpi = `LANG=C acpi 2>&1 || true`;
 		if($acpi eq "") {
 			# retry on next rare occasion
 			$acpi_output_text = "";
