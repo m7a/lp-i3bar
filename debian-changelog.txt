@@ -1,3 +1,9 @@
+mdvl-i3bar (1.0.4) stable; urgency=medium
+
+  * Fix bugs wrt. hot-added filesystems and network interfaces.
+
+ -- Linux-Fan, Ma_Sys.ma <Ma_Sys.ma@web.de>  Thu, 04 Jun 2020 23:42:16 +0200
+
 mdvl-i3bar (1.0.3) stable; urgency=medium
 
   * Attempt to fix bugs wrt. hot-added filesystems and network interface
