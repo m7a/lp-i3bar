@@ -1,11 +1,13 @@
 #!/usr/bin/perl
-# Ma_Sys.ma i3bar Script 1.0.0, Copyright (c) 2020 Ma_Sys.ma.
+# Ma_Sys.ma i3bar Script 1.0.1, Copyright (c) 2020 Ma_Sys.ma.
 # For further info send an e-mail to Ma_Sys.ma@web.de.
 
 # This code incoporates an external module under different copyright, see
 # section "BEGIN CpuTopology.pm Module"
 
-# TODO BUG: Hot-adding a network interface crashes the status bar.
+# TODO TEST BUG: Hot-adding a network interface crashes the status bar.
+# TODO TEST BUG: CPU load displayed wrongly in case of io: iowait is more similar to idle than load!
+# TODO TEST BUG: Hot-adding a filesystem and hot-removing a filesystme crashes the status bar.
 
 use 5.010;
 use strict;
@@ -115,9 +117,6 @@ sub write_blocks {
 	write_acpi_battery_block($perform_rare_tasks);
 	write_ups_block($perform_rare_tasks);
 
-	# [laptop: wifi connectivity]
-	# [laptop: acpi battery]
-
 	write_loadavg_block($stats->{loadavg});
 	write_clock_block($timestamp_ref);
 
@@ -215,8 +214,10 @@ sub write_cpu_block {
 	my $curthread = 0;
 	my $sep = "";
 	for(my $i = 0; $i < $topo_threads_total; $i++) {
-		$entry .= $sep.get_gauge_vert(100.0 -
-						$stats->{"cpu$i"}->{idle});
+		my $cpunam = "cpu$i";
+		$entry .= $sep.get_gauge_vert(
+					100.0 - $stats->{$cpunam}->{idle} -
+						$stats->{$cpunam}->{iowait});
 		if(++$curthread >= $topo_threads_per_core) {
 			$curthread = 0;
 			if(++$curcore >= $topo_cores_per_socket) {
@@ -230,8 +231,8 @@ sub write_cpu_block {
 		}
 	}
 
-	write_entry($entry, color_by_threshold(100.0 - $stats->{cpu}->{idle},
-								20.0, 80.0));
+	write_entry($entry, color_by_threshold(100.0 - $stats->{cpu}->{idle} -
+					$stats->{cpu}->{iowait}, 20.0, 80.0));
 }
 
 # $1 percentage [0;100]
@@ -313,6 +314,10 @@ sub write_disk_block {
 	for my $disk (@disks) {
 		# disk load segment
 		my ($seg_dl, $color_dl) = get_disk_stats($stats, $disk->[2]);
+
+		# skip fs which were removed in the meantime
+		next unless defined($seg_dl);
+
 		# for simplicity, add label before seg_dl (will color the
 		# label under IO load but simplifies the case distinction
 		# below...)
@@ -320,6 +325,7 @@ sub write_disk_block {
 
 		# disk usage segment
 		my $df        = Filesys::Df::df($disk->[0]);
+		next unless defined($df->{blocks});
 		my $total     = $df->{blocks};
 		my $used      = $total - $df->{bavail};
 		my $util_perc = $used * 100 / $total;
@@ -362,6 +368,7 @@ sub write_disk_block {
 
 sub get_disk_stats {
 	my ($stats, $dev) = @_;
+	return (undef, undef) unless defined($stats->{$dev});
 	my $ttreq = $stats->{$dev}->{ttreq};
 	my $ttbyt = $stats->{$dev}->{ttbyt};
 
@@ -390,7 +397,7 @@ sub populate_disks_info {
 	my @all_fs = ();
 	open(my $fh, "/proc/mounts");
 	while(<$fh>) {
-		next unless $_ =~ /^\/dev\//;
+		next if not($_ =~ /^\/dev\//) or ($_ =~ /,nodev,/);
 		my @fields = split(/\s+/);
 		push @all_fs, $fields[1];
 		$disk_devices{$fields[1]} = basename($fields[0]);
@@ -528,7 +535,8 @@ sub write_network_interfaces_block {
 	}
 
 	for(my $i = 0; $i <= $#interfaces_state; $i++) {
-		next unless $interfaces_state[$i]->[2];
+		next if (not($interfaces_state[$i]->[2]) or
+			 not(defined($stats->{$interfaces_state[$i]->[0]})));
 		my $txbyt = $stats->{$interfaces_state[$i]->[0]}->{txbyt};
 		my $rxbyt = $stats->{$interfaces_state[$i]->[0]}->{rxbyt};
 		my $alltransfer = ($rxbyt + $txbyt) / 1024 / 1024; # MiB/s

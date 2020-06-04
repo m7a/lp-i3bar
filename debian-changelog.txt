@@ -1,3 +1,10 @@
+mdvl-i3bar (1.0.3) stable; urgency=medium
+
+  * Attempt to fix bugs wrt. hot-added filesystems and network interface
+    names.
+
+ -- Linux-Fan, Ma_Sys.ma <Ma_Sys.ma@web.de>  Thu, 04 Jun 2020 22:50:25 +0200
+
 mdvl-i3bar (1.0.2) stable; urgency=medium
 
   * Add dependencies manually (autodetection failed?)
