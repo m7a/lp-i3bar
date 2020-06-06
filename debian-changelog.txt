@@ -1,3 +1,9 @@
+mdvl-i3bar (1.0.5) stable; urgency=medium
+
+  * Fix wrongly displayed progress bar with mdadm block.
+
+ -- Linux-Fan, Ma_Sys.ma <Ma_Sys.ma@web.de>  Sun, 07 Jun 2020 01:30:14 +0200
+
 mdvl-i3bar (1.0.4) stable; urgency=medium
 
   * Fix bugs wrt. hot-added filesystems and network interfaces.
