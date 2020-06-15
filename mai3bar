@@ -485,10 +485,10 @@ sub write_screenindex_block {
 	my $perform_rare_tasks   = shift;
 
 	if(not(defined($screenindex_bar)) or $perform_rare_tasks) {
-		my $perc = -1;
+		my $perc;
 		try {
 			open my $fd, "-|", "screenindex -v d current -r 2>&1";
-			my $perc;
+			# <=> tail -n 1 / last line contains the percentage.
 			while(<$fd>) {
 				$perc = $_;
 			}
