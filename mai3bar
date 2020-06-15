@@ -500,11 +500,12 @@ sub write_screenindex_block {
 		# TODO z Might want to log this error somewhere else than
 		#        /dev/null...
 		if($perc == -1) {
-			$screenindex_bar = "";
-			return;
+			$screenindex_bar   = "SCREENINDEX:E";
+			$screenindex_color = COLOR_WARN;
+		} else {
+			$screenindex_bar   = "SC ".get_gauge_horiz($perc);
+			$screenindex_color = color_by_threshold($perc, 80, 99);
 		}
-		$screenindex_bar = "SC ".get_gauge_horiz($perc);
-		$screenindex_color = color_by_threshold($perc, 80, 99);
 	}
 
 	write_entry($screenindex_bar, $screenindex_color);

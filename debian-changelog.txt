@@ -1,3 +1,9 @@
+mdvl-i3bar (1.0.8) stable; urgency=medium
+
+  * Display error message on screenindex crash.
+
+ -- Linux-Fan, Ma_Sys.ma <Ma_Sys.ma@web.de>  Mon, 15 Jun 2020 23:57:30 +0200
+
 mdvl-i3bar (1.0.7) stable; urgency=medium
 
   * 2nd attempt to fix crash on screenindex error.
