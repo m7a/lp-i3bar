@@ -487,7 +487,7 @@ sub write_screenindex_block {
 	if(not(defined($screenindex_bar)) or $perform_rare_tasks) {
 		my $perc = -1;
 		try {
-			open my $fd, "-|", "screenindex -v d current -r";
+			open my $fd, "-|", "screenindex -v d current -r 2>&1";
 			my $perc;
 			while(<$fd>) {
 				$perc = $_;
@@ -497,6 +497,8 @@ sub write_screenindex_block {
 			$perc = -1;
 		};
 		# Cancel and retry upon perform rare tasks.
+		# TODO z Might want to log this error somewhere else than
+		#        /dev/null...
 		if($perc == -1) {
 			$screenindex_bar = "";
 			return;
