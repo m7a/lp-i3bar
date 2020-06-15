@@ -1,3 +1,9 @@
+mdvl-i3bar (1.0.6) stable; urgency=medium
+
+  * Fix crash on screenindex error.
+
+ -- Linux-Fan, Ma_Sys.ma <Ma_Sys.ma@web.de>  Mon, 15 Jun 2020 23:51:45 +0200
+
 mdvl-i3bar (1.0.5) stable; urgency=medium
 
   * Fix wrongly displayed progress bar with mdadm block.

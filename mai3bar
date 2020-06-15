@@ -11,17 +11,20 @@ use     warnings FATAL => 'all';
 use     autodie;
 
 require List::Util;
-require Sys::Statistics::Linux; # libsys-statistics-linux-perl
 require Filesys::Df;            # libfilesys-df-perl
 require Time::HiRes;
 require IO::Socket;
 require IO::Interface::Simple;  # libio-interface-perl
+require Sys::Statistics::Linux; # libsys-statistics-linux-perl
 require File::Which;            # libfile-which-perl
 
 use     Try::Tiny;
 use     File::Basename;
 
 #use Data::Dumper 'Dumper'; # debug only
+
+# TODO PROPOSED UNTESTED FIX FOR DiskStats.pm
+# if ($line =~ /^\s+(\d+)\s+(\d+)\s+(\S+)\s+(\d+)\s+\d+\s+(\d+)\s+\d+\s+(\d+)\s+\d+\s+(\d+)\s+\d+\s+\d+\s+\d+\s+\d+(?:(?:\s+\d+)+)?$/) { 
 
 use constant COLOR_NORM   => "#eeeeee";
 use constant COLOR_WARN   => "#ffff00";
@@ -482,12 +485,22 @@ sub write_screenindex_block {
 	my $perform_rare_tasks   = shift;
 
 	if(not(defined($screenindex_bar)) or $perform_rare_tasks) {
-		open my $fd, "-|", "screenindex -v d current -r";
-		my $perc;
-		while(<$fd>) {
-			$perc = $_;
+		my $perc = -1;
+		try {
+			open my $fd, "-|", "screenindex -v d current -r";
+			my $perc;
+			while(<$fd>) {
+				$perc = $_;
+			}
+			close $fd;
+		} catch {
+			$perc = -1;
+		};
+		# Cancel and retry upon perform rare tasks.
+		if($perc == -1) {
+			$screenindex_bar = "";
+			return;
 		}
-		close $fd;
 		$screenindex_bar = "SC ".get_gauge_horiz($perc);
 		$screenindex_color = color_by_threshold($perc, 80, 99);
 	}
