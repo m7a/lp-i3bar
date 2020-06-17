@@ -23,8 +23,7 @@ use     File::Basename;
 
 #use Data::Dumper 'Dumper'; # debug only
 
-# TODO PROPOSED UNTESTED FIX FOR DiskStats.pm
-# if ($line =~ /^\s+(\d+)\s+(\d+)\s+(\S+)\s+(\d+)\s+\d+\s+(\d+)\s+\d+\s+(\d+)\s+\d+\s+(\d+)\s+\d+\s+\d+\s+\d+\s+\d+(?:(?:\s+\d+)+)?$/) { 
+# TODO PROPOSED FIX FOR DiskStats.pm if ($line =~ /^\s+(\d+)\s+(\d+)\s+(\S+)\s+(\d+)\s+\d+\s+(\d+)\s+\d+\s+(\d+)\s+\d+\s+(\d+)\s+\d+\s+\d+\s+\d+\s+\d+(?:(?:\s+\d+)+)?$/) {  -> https://rt.cpan.org/Public/Bug/Display.html?id=128904
 
 use constant COLOR_NORM   => "#eeeeee";
 use constant COLOR_WARN   => "#ffff00";
