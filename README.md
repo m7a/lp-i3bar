@@ -319,6 +319,8 @@ not fit the common expectations of how values would appear in a status bar:
    actual turning of seconds such that the clock is expected to be more accurate
    than with other status bars.
 
+![Screenshot of the Ma_Sys.ma i3bar on a typical VM, observe the RAM being in MiB](i3bar_att/new_short_vm.png)
+
 ![Screenshot of the Ma_Sys.ma i3bar on the Ma_Sys.ma main system pte5](i3bar_att/new_extended.png)
 
 Summary of items displayed:
@@ -368,4 +370,19 @@ The algorithm does the following steps:
     For the current and all subsequent names in the sorted list.
     Remove their longest common prefix.
  4. Continue with the _prefix reduced list_.
- 5. _TODO WRITE ABOUT 2ND PASS_
+ 5. Process each item in the prefix reduced list:
+ 6. Take the shortest prefix of the item such that it is not a prefix of any
+    other item in the list.
+ 7. Output the resulting names.
+
+Example shortenings:
+
+Input             Prefix Reduced List  Output
+----------------  -------------------  ----------
+eno1, ens1        o1, s1               o, s
+eno1, eno2, ens1  o1, o2, s1           o1, o2, s
+/*, /data,        /, data, e01, ll     /, d, e, l
+/fs/e01, /fs/ll
+
+*) As a special execption, an empty string is kept to be `/` instead of being
+reduced to the empty string for being a prefix of each other entry.
