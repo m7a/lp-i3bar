@@ -138,7 +138,7 @@ sub write_mdstat_block {
 
 	state $mdstat = undef;
 
-	if($perform_rare_tasks) {
+	if($perform_rare_tasks and -f "/proc/mdstat") {
 		open(my $fh, "/proc/mdstat");
 		my $curminproc = 1000;
 		$mdstat = undef;

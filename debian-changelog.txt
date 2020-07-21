@@ -1,3 +1,9 @@
+mdvl-i3bar (1.0.10) stable; urgency=medium
+
+  * Fix crash upon nonexistent /proc/mdstat.
+
+ -- Linux-Fan, Ma_Sys.ma <Ma_Sys.ma@web.de>  Tue, 21 Jul 2020 18:43:33 +0200
+
 mdvl-i3bar (1.0.9) stable; urgency=medium
 
   * Fix regression wrt. screenindex no longer being shown.
