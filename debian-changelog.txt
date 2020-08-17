@@ -1,3 +1,10 @@
+mdvl-i3bar (1.0.11) stable; urgency=medium
+
+  * Attempt to fix crash for specific uncommon ACPI output (Charging without
+    time remaining).
+
+ -- Linux-Fan, Ma_Sys.ma <Ma_Sys.ma@web.de>  Mon, 17 Aug 2020 21:53:59 +0200
+
 mdvl-i3bar (1.0.10) stable; urgency=medium
 
   * Fix crash upon nonexistent /proc/mdstat.

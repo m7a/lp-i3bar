@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# Ma_Sys.ma i3bar Script 1.0.3, Copyright (c) 2020 Ma_Sys.ma.
+# Ma_Sys.ma i3bar Script 1.0.4, Copyright (c) 2020 Ma_Sys.ma.
 # For further info send an e-mail to Ma_Sys.ma@web.de.
 
 # This code incoporates an external module under different copyright, see
@@ -21,7 +21,7 @@ require File::Which;            # libfile-which-perl
 use     Try::Tiny;
 use     File::Basename;
 
-#use Data::Dumper 'Dumper'; # debug only
+use Data::Dumper 'Dumper'; # debug only
 # TODO z PROPOSED FIX FOR DiskStats.pm if ($line =~ /^\s+(\d+)\s+(\d+)\s+(\S+)\s+(\d+)\s+\d+\s+(\d+)\s+\d+\s+(\d+)\s+\d+\s+(\d+)\s+\d+\s+\d+\s+\d+\s+\d+(?:(?:\s+\d+)+)?$/) {  -> https://rt.cpan.org/Public/Bug/Display.html?id=128904
 
 use constant COLOR_NORM   => "#eeeeee";
@@ -602,8 +602,9 @@ sub write_acpi_battery_block {
 			$acpi_output_text = "";
 			return;
 		}
-		$acpi =~ s/^.*: ([A-Z])[^,]+, ([0-9]+)%,? ?([^ ]+)?.*\n$/$1 $2 $3/g;
-		my @parts = split / /, $acpi;
+		$acpi =~ s/^.*: ([A-Z])[^,]+, ([0-9]+)%,? ?([^ ]*).*\n$/$1 $2 $3/g;
+		my @parts = split / /, $acpi, -1;
+		# TODO z it is not sure if the script would not fail earlier here?
 		return unless $#parts == 2; # sometimes acpi may return garbage
 		my $state = substr($parts[0], 0, 1);
 		my $perc  = $parts[1];
@@ -611,7 +612,7 @@ sub write_acpi_battery_block {
 		$acpi_output_color = $system_is_on_ac?
 				COLOR_NORM: color_by_threshold($perc, 10, 40);
 		$acpi_output_text = $state." ".get_gauge_horiz($perc)." ".
-				$parts[2];
+				(($parts[2] eq "")? "<?>": $parts[2]);
 	}
 
 	write_entry($acpi_output_text, $acpi_output_color)
