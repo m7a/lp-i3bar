@@ -99,11 +99,12 @@ Example:
 The Legacy
 ==========
 
+![Old status bar for XFCE](i3bar_att/xfceold.png)
+
 The Ma_Sys.ma journey through status bars was roughly like this:
 
- * XFCE (3?) integrated status bar -- little is known about this, because it
-   was a long time (say more than 10 years as of this writing) ago. That time,
-   mostly disk usage was checked
+ * XFCE (3?) integrated status bar. That time, mostly disk usage and CPU load
+   were checked and space was used rather inefficiently.
  * Standalone conky. Initially a hand-crafted configuration file and soon a
    script to generate a configuration file dependent on the presence of
    certain file systems and information on different machines. There was only
