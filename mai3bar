@@ -429,7 +429,10 @@ sub assign_names {
 				}
 			}
 			if($iseq) {
-				for(my $j = $i; $j <= $#all_in; $j++)  {
+				if($intermediate_names[$i] eq "") {
+					last;
+				}
+				for(my $j = $i; $j <= $#all_in; $j++) {
 					$intermediate_names[$j] = substr(
 						$intermediate_names[$j], 1);
 				}
