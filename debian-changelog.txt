@@ -1,3 +1,10 @@
+mdvl-i3bar (1.0.12) stable; urgency=medium
+
+  * Degrade i3 requirement to recommends because one can run mai3bar on
+    text consoles, too.
+
+ -- Linux-Fan, Ma_Sys.ma <Ma_Sys.ma@web.de>  Thu, 27 Aug 2020 02:09:49 +0200
+
 mdvl-i3bar (1.0.11) stable; urgency=medium
 
   * Attempt to fix crash for specific uncommon ACPI output (Charging without
