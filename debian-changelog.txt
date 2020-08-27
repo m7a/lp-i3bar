@@ -1,3 +1,9 @@
+mdvl-i3bar (1.0.13) stable; urgency=medium
+
+  * Trigger build / Fix crash in certain mount situations.
+
+ -- Linux-Fan, Ma_Sys.ma <Ma_Sys.ma@web.de>  Thu, 27 Aug 2020 19:05:56 +0200
+
 mdvl-i3bar (1.0.12) stable; urgency=medium
 
   * Degrade i3 requirement to recommends because one can run mai3bar on
