@@ -398,8 +398,10 @@ sub populate_disks_info {
 	my @all_fs = ();
 	open(my $fh, "/proc/mounts");
 	while(<$fh>) {
-		next if not($_ =~ /^\/dev\//) or ($_ =~ /,nodev,/);
+		next if not($_ =~ /^\/dev\//) or ($_ =~ /,nodev,/) or
+						($_ =~ /^\/dev\/loop[0-9]$/);
 		my @fields = split(/\s+/);
+
 		push @all_fs, $fields[1];
 		$disk_devices{$fields[1]} = basename($fields[0]);
 	}
