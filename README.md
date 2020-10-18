@@ -215,7 +215,7 @@ The configuration format is already conky's new format such that script
 `ma_genconkyconf_new` may still be used if one wants to create a similar
 status bar.
 
-The disadvantage of the integrateion with i3bar is complexity: To generate the
+The disadvantage of the integration with i3bar is complexity: To generate the
 JSON output needed by i3bar, a very convoluted Conky configuration file is
 generated and one cannot run conky directly from i3bar -- a wrapper script for
 displaying a leading `{"version:1"}[` string is needed. Additionally, conky

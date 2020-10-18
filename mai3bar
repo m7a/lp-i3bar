@@ -301,12 +301,13 @@ sub write_swap_block {
 	# performance, thus not part of the same function yet?
 	my $swaptotal = $stats->{swaptotal};
 	my $factor    = get_mem_factor_bytes($swaptotal);
-	my $totalstr  = sprintf("%.0f", $swaptotal/$factor);
+	my $totalstr  = sprintf("%.0f", $swaptotal / $factor);
 	my $fmt       = "SW%".length($totalstr).".0f/%s";
 
 	my $swaputil  = $stats->{swapused} - $stats->{swapcached};
+	my $swapusep  = ($swaptotal lt 1)? 0: ($swaputil / $swaptotal);
 	write_entry(sprintf($fmt, $swaputil / $factor, $totalstr),
-			color_by_threshold($swaputil/$swaptotal, 0.09, 0.50));
+				color_by_threshold($swapusep, 0.09, 0.50));
 }
 
 sub write_disk_block {
@@ -411,6 +412,7 @@ sub populate_disks_info {
 
 # $1 reference to output list
 # $2 reference to input list of names to consider
+# TODO BUG: IF THE KERNEL THINKS THAT THE SAME DEVICE IS MOUNTED TWICE UNDER THE SAME PATH THEN THIS MAY FAIL GENERATING TWO ADDITIONAL `/` ITEMS. NOTE THAT THERE IS NO WAY TO REALLY AVOID THE DUPLICATE BUT IT SHOULD AT LEAST NOT BE NAMED `/` / ALSO THIS CAUSES THE iseq = 1 and intermediate_names = '' in Line 433.. / EASIEST SOLUTION MAY BE TO REMOVE ALL DUPLICATES IN @all_in?
 sub assign_names {
 	my ($output_list, $all_in_ref) = @_;
 	my @all_in = @{$all_in_ref};
@@ -429,9 +431,7 @@ sub assign_names {
 				}
 			}
 			if($iseq) {
-				if($intermediate_names[$i] eq "") {
-					last;
-				}
+				last if($intermediate_names[$i] eq "");
 				for(my $j = $i; $j <= $#all_in; $j++) {
 					$intermediate_names[$j] = substr(
 						$intermediate_names[$j], 1);

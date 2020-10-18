@@ -1,3 +1,9 @@
+mdvl-i3bar (1.0.14) stable; urgency=medium
+
+  * Attempt to fix crash if no swap is available.
+
+ -- Linux-Fan, Ma_Sys.ma <Ma_Sys.ma@web.de>  Sun, 18 Oct 2020 15:06:26 +0200
+
 mdvl-i3bar (1.0.13) stable; urgency=medium
 
   * Trigger build / Fix crash in certain mount situations.
