@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# Ma_Sys.ma i3bar Script 1.0.4, Copyright (c) 2020 Ma_Sys.ma.
+# Ma_Sys.ma i3bar Script 1.0.5, Copyright (c) 2020 Ma_Sys.ma.
 # For further info send an e-mail to Ma_Sys.ma@web.de.
 
 # This code incoporates an external module under different copyright, see
@@ -323,9 +323,6 @@ sub write_disk_block {
 		# disk load segment
 		my ($seg_dl, $color_dl) = get_disk_stats($stats, $disk->[2]);
 
-		# skip fs which were removed in the meantime
-		next unless defined($seg_dl);
-
 		# for simplicity, add label before seg_dl (will color the
 		# label under IO load but simplifies the case distinction
 		# below...)
@@ -333,6 +330,7 @@ sub write_disk_block {
 
 		# disk usage segment
 		my $df        = Filesys::Df::df($disk->[0]);
+		# skip fs which were removed in the meantime
 		next unless defined($df->{blocks});
 		my $total     = $df->{blocks};
 		my $used      = $total - $df->{bavail};
@@ -369,7 +367,7 @@ sub write_disk_block {
 
 sub get_disk_stats {
 	my ($stats, $dev) = @_;
-	return (undef, undef) unless defined($stats->{$dev});
+	return ("[??]", COLOR_NORM) unless defined($stats->{$dev});
 	my $ttreq = $stats->{$dev}->{ttreq};
 	my $ttbyt = $stats->{$dev}->{ttbyt};
 
@@ -399,12 +397,15 @@ sub populate_disks_info {
 	open(my $fh, "/proc/mounts");
 	while(<$fh>) {
 		# Which FS are interesting:
-		#  -> Include /dev excrept /dev/loop
-		#  -> Exclude non-/dev except tmpfs if on live system
-		#  -> Exclude all nodev
-		next if not($_ =~ /^\/dev\// or
-				$_ =~ /^tmpfs \/run\/live\/overlay tmpfs/) or
-			($_ =~ /,nodev,/) or ($_ =~ /^\/dev\/loop[0-9]/);
+		next unless (
+			# -> Include /dev excrept /dev/loop
+			($_ =~ /^\/dev\// and not $_ =~ /^\/dev\/loop[0-9]/) or
+			# -> Include non-/dev if zfs
+			($_ =~ /^[a-z0-9\/]+ [a-z0-9\/]+ zfs /) or
+			# -> Include non-/dev if tmpfs and live system
+			($_ =~ /^tmpfs \/run\/live\/overlay tmpfs/)
+			# -> Exclude all other
+		);
 
 		my @fields = split(/\s+/);
 
