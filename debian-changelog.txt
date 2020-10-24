@@ -1,3 +1,9 @@
+mdvl-i3bar (1.0.18) stable; urgency=medium
+
+  * Do not display verbose "no IO statistics" indicator.
+
+ -- Linux-Fan, Ma_Sys.ma <Ma_Sys.ma@web.de>  Sat, 24 Oct 2020 23:03:00 +0200
+
 mdvl-i3bar (1.0.17) stable; urgency=medium
 
   * Workaround FS not being displayed if they are ZFS.

@@ -367,7 +367,9 @@ sub write_disk_block {
 
 sub get_disk_stats {
 	my ($stats, $dev) = @_;
-	return ("[??]", COLOR_NORM) unless defined($stats->{$dev});
+	# newly return "?" string rather than [??] because [??] is not
+	# really useful but clutters space a lot more
+	return ("?", COLOR_NORM) unless defined($stats->{$dev});
 	my $ttreq = $stats->{$dev}->{ttreq};
 	my $ttbyt = $stats->{$dev}->{ttbyt};
 
