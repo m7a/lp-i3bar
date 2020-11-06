@@ -1,3 +1,10 @@
+mdvl-i3bar (1.0.19) stable; urgency=medium
+
+  * Remove IOPS display feature as it is less useful on ZFS-enabled systems.
+    Experimental work on supporting zfs scrubs.
+
+ -- Linux-Fan, Ma_Sys.ma <Ma_Sys.ma@web.de>  Fri, 06 Nov 2020 23:17:54 +0100
+
 mdvl-i3bar (1.0.18) stable; urgency=medium
 
   * Do not display verbose "no IO statistics" indicator.

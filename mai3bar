@@ -51,7 +51,6 @@ sub main {
 		memstats  => 1,
 		loadavg   => 1,
 		netstats  => 1,
-		diskstats => 1,
 	);
 	$lxs->init;
 
@@ -113,11 +112,13 @@ sub write_blocks {
 	$is_first_entry = 1;
 
 	write_mdstat_block($perform_rare_tasks);
+	write_zfs_scrub_block($perform_rare_tasks);
+
 	write_host_block($stats->{sysinfo});
 	write_cpu_block($stats->{cpustats});
 	write_ram_block($stats->{memstats});
 	write_swap_block($stats->{memstats});
-	write_disk_block($perform_rare_tasks, $stats->{diskstats});
+	write_disk_block($perform_rare_tasks);
 
 	write_screenindex_block($perform_rare_tasks);
 	write_network_interfaces_block($perform_rare_tasks, $stats->{netstats});
@@ -135,7 +136,6 @@ sub write_blocks {
 
 sub write_mdstat_block {
 	my $perform_rare_tasks = shift;
-
 	state $mdstat = undef;
 
 	if($perform_rare_tasks and -f "/proc/mdstat") {
@@ -156,6 +156,30 @@ sub write_mdstat_block {
 	}
 
 	write_entry("M".$mdstat, COLOR_WARN) if(defined($mdstat));
+}
+
+sub write_zfs_scrub_block {
+	my $perform_rare_tasks = shift;
+	state $zfsscrub = undef;
+
+	if($perform_rare_tasks and -x "/sbin/zpool") {
+		try {
+			open my $fd, "-|", "zpool status";
+			while(<$fd>) {
+				next unless $_ =~ /% done$/;
+				my $idx0 = index($_, ", ");
+				my $idx1 = index($_, "% done");
+				my $perc = substr($_, $idx0, $idx1 - $idx0 + 1);
+				$zfsscrub = $perc if(not(defined($zfsscrub)) or
+							($perc < $zfsscrub));
+			}
+			close $fd;
+		} catch {
+			$zfsscrub = undef;
+		};
+	}
+
+	write_entry("Z".$zfsscrub, COLOR_WARN) if(defined($zfsscrub));
 }
 
 # $1 entry data
@@ -313,21 +337,13 @@ sub write_swap_block {
 sub write_disk_block {
 	state @disks;
 
-	my ($perform_rare_tasks, $stats) = @_;
+	my $perform_rare_tasks = shift;
 	if($perform_rare_tasks) {
 		@disks = ();
 		populate_disks_info(\@disks);
 	}
 
 	for my $disk (@disks) {
-		# disk load segment
-		my ($seg_dl, $color_dl) = get_disk_stats($stats, $disk->[2]);
-
-		# for simplicity, add label before seg_dl (will color the
-		# label under IO load but simplifies the case distinction
-		# below...)
-		$seg_dl = $disk->[1].$seg_dl;
-
 		# disk usage segment
 		my $df        = Filesys::Df::df($disk->[0]);
 		# skip fs which were removed in the meantime
@@ -340,56 +356,22 @@ sub write_disk_block {
 					$used / 1024 / 1024)."/".$totalgstr;
 		my $color_du  = color_by_threshold($util_perc, 87, 97);
 
+		my $entry     = $disk->[1]." ".$seg_du;
+
 		# write segments
 		#write_entry_no_sep($disk->[1], COLOR_NORM, BGCOLOR_NORM);
-		my $seg_width = length($seg_dl) + length($seg_du);
+		my $seg_width = length($entry);
 		my $lim_bgcol = int($used * $seg_width / $total);
-		my $seg_dllen = length($seg_dl);
-		if($lim_bgcol != 0) {
-			write_entry_no_sep(substr($seg_dl, 0, $lim_bgcol),
-						$color_dl, BGCOLOR_USED);
-		}
-		if($lim_bgcol < $seg_dllen) {
-			write_entry_no_sep(substr($seg_dl, $lim_bgcol),
-						$color_dl, BGCOLOR_FREE);
-		}
-		$lim_bgcol -= $seg_dllen;
-		if($lim_bgcol > 0) {
-			write_entry_no_sep(substr($seg_du, 0, $lim_bgcol),
-						$color_du, BGCOLOR_USED);
-			write_entry(substr($seg_du, $lim_bgcol),
+		if($lim_bgcol == 0) {
+			write_entry(substr($entry, 0, $lim_bgcol),
 						$color_du, BGCOLOR_FREE);
 		} else {
-			write_entry($seg_du, $color_du, BGCOLOR_FREE);
+			write_entry_no_sep(substr($entry, 0, $lim_bgcol),
+						$color_du, BGCOLOR_USED);
+			write_entry(substr($entry, $lim_bgcol),
+						$color_du, BGCOLOR_FREE);
 		}
 	}
-}
-
-sub get_disk_stats {
-	my ($stats, $dev) = @_;
-	# newly return "?" string rather than [??] because [??] is not
-	# really useful but clutters space a lot more
-	return ("?", COLOR_NORM) unless defined($stats->{$dev});
-	my $ttreq = $stats->{$dev}->{ttreq};
-	my $ttbyt = $stats->{$dev}->{ttbyt};
-
-	my @units = ("B", "K", "M", "G", "T");
-	while($ttbyt > 1024 and $#units) {
-		$ttbyt /= 1024;
-		shift @units;
-	}
-
-	my $color = COLOR_NORM;
-	my $unit = shift @units;
-	if($unit eq "G" or $unit eq "T" or ($unit eq "M" and $ttbyt > 90) or
-							$ttreq > 10_000) {
-		$color = COLOR_CRIT;
-	} elsif(($unit eq "M" and $ttbyt > 10) or $ttreq > 500) {
-		$color = COLOR_WARN;
-	}
-
-	my $log = $ttreq >= 5? (log($ttreq) / log(10)): 0;
-	return (sprintf("[%1.0f%s]", $log, $unit), $color);
 }
 
 sub populate_disks_info {
@@ -400,10 +382,12 @@ sub populate_disks_info {
 	while(<$fh>) {
 		# Which FS are interesting:
 		next unless (
-			# -> Include /dev excrept /dev/loop
-			($_ =~ /^\/dev\// and not $_ =~ /^\/dev\/loop[0-9]/) or
-			# -> Include non-/dev if zfs
-			($_ =~ /^[a-z0-9\/]+ [a-z0-9\/]+ zfs /) or
+			# -> Include /dev except /dev/loop and ESP
+			($_ =~ /^\/dev\// and not $_ =~ /^\/dev\/loop[0-9]/
+				and not $_ =~ / \/boot\/efi /) or
+			# -> Include non-/dev if zfs except docker graph
+			($_ =~ /^[a-z0-9\/]+ [a-z0-9\/]+ zfs /
+				and not $_ =~ /docker.*\/zfs\/graph/) or
 			# -> Include non-/dev if tmpfs and live system
 			($_ =~ /^tmpfs \/run\/live\/overlay tmpfs/)
 			# -> Exclude all other
