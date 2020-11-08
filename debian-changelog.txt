@@ -1,3 +1,11 @@
+mdvl-i3bar (1.0.20) stable; urgency=medium
+
+  * Use hash to keep track of already processed device names as to generate only
+    a single entry per device. This avoids having multiple entries from bind
+    mounts.
+
+ -- Linux-Fan, Ma_Sys.ma <Ma_Sys.ma@web.de>  Sun, 08 Nov 2020 14:37:24 +0100
+
 mdvl-i3bar (1.0.19) stable; urgency=medium
 
   * Remove IOPS display feature as it is less useful on ZFS-enabled systems.

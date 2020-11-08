@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# Ma_Sys.ma i3bar Script 1.0.5, Copyright (c) 2020 Ma_Sys.ma.
+# Ma_Sys.ma i3bar Script 1.0.6, Copyright (c) 2020 Ma_Sys.ma.
 # For further info send an e-mail to Ma_Sys.ma@web.de.
 
 # This code incoporates an external module under different copyright, see
@@ -377,6 +377,7 @@ sub write_disk_block {
 sub populate_disks_info {
 	my $disks = shift;
 	my %disk_devices = ();
+	my %known_devices = ();
 	my @all_fs = ();
 	open(my $fh, "/proc/mounts");
 	while(<$fh>) {
@@ -394,6 +395,11 @@ sub populate_disks_info {
 		);
 
 		my @fields = split(/\s+/);
+
+		# Keep track of devices to avoid multiple entries for bind mount
+		# results. The first item is retained.
+		next if(defined($known_devices{$fields[0]}));
+		$known_devices{$fields[0]} = 1;
 
 		push @all_fs, $fields[1];
 		$disk_devices{$fields[1]} = basename($fields[0]);
