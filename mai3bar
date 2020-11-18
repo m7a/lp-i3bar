@@ -165,15 +165,22 @@ sub write_zfs_scrub_block {
 	if($perform_rare_tasks and -x "/sbin/zpool") {
 		try {
 			open my $fd, "-|", "zpool status";
+			my $minperc = 101;
 			while(<$fd>) {
-				next unless $_ =~ /% done$/;
+				next unless $_ =~ /% done/;
 				my $idx0 = index($_, ", ");
 				my $idx1 = index($_, "% done");
-				my $perc = substr($_, $idx0, $idx1 - $idx0 + 1);
-				$zfsscrub = $perc if(not(defined($zfsscrub)) or
-							($perc < $zfsscrub));
+				my $perc = substr($_, $idx0 + 2,
+							$idx1 - $idx0 - 2);
+				$minperc = $perc if($perc < $minperc);
 			}
 			close $fd;
+			if($minperc gt 100) {
+				$zfsscrub = undef;
+			} elsif(not(defined($zfsscrub)) or
+						($minperc gt $zfsscrub)) {
+				$zfsscrub = $minperc;
+			}
 		} catch {
 			$zfsscrub = undef;
 		};
