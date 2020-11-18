@@ -1,3 +1,9 @@
+mdvl-i3bar (1.0.22) stable; urgency=medium
+
+  * 2nd attempt to fix ZFS display.
+
+ -- Linux-Fan, Ma_Sys.ma <Ma_Sys.ma@web.de>  Wed, 18 Nov 2020 10:19:48 +0100
+
 mdvl-i3bar (1.0.21) stable; urgency=medium
 
   * Fix ZFS display.

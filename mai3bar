@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# Ma_Sys.ma i3bar Script 1.0.6, Copyright (c) 2020 Ma_Sys.ma.
+# Ma_Sys.ma i3bar Script 1.0.7, Copyright (c) 2020 Ma_Sys.ma.
 # For further info send an e-mail to Ma_Sys.ma@web.de.
 
 # This code incoporates an external module under different copyright, see
@@ -175,10 +175,10 @@ sub write_zfs_scrub_block {
 				$minperc = $perc if($perc < $minperc);
 			}
 			close $fd;
-			if($minperc gt 100) {
+			if($minperc > 100) {
 				$zfsscrub = undef;
 			} elsif(not(defined($zfsscrub)) or
-						($minperc gt $zfsscrub)) {
+						($minperc > $zfsscrub)) {
 				$zfsscrub = $minperc;
 			}
 		} catch {
