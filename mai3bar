@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# Ma_Sys.ma i3bar Script 1.0.7, Copyright (c) 2020 Ma_Sys.ma.
+# Ma_Sys.ma i3bar Script 1.0.8, Copyright (c) 2020, 2021 Ma_Sys.ma.
 # For further info send an e-mail to Ma_Sys.ma@web.de.
 
 # This code incoporates an external module under different copyright, see
@@ -620,8 +620,9 @@ sub write_acpi_battery_block {
 		my $state = substr($parts[0], 0, 1);
 		my $perc  = $parts[1];
 		$system_is_on_ac = ($state eq "C" or $state eq "F");
-		$acpi_output_color = $system_is_on_ac?
-				COLOR_NORM: color_by_threshold($perc, 10, 40);
+		# color by percent empty
+		$acpi_output_color = $system_is_on_ac? COLOR_NORM:
+					color_by_threshold(100 - $perc, 60, 90);
 		$acpi_output_text = $state." ".get_gauge_horiz($perc)." ".
 				(($parts[2] eq "")? "<?>": $parts[2]);
 	}

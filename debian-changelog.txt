@@ -1,3 +1,9 @@
+mdvl-i3bar (1.0.23) stable; urgency=medium
+
+  * Fix acpi remaining battery percentage thresholds.
+
+ -- Linux-Fan, Ma_Sys.ma <Ma_Sys.ma@web.de>  Tue, 16 Mar 2021 19:05:45 +0100
+
 mdvl-i3bar (1.0.22) stable; urgency=medium
 
   * 2nd attempt to fix ZFS display.
