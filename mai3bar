@@ -567,8 +567,11 @@ sub write_network_interfaces_block {
 								}->{rxbyt};
 			# MiB/s
 			my $alltransfer = ($rxbyt + $txbyt) / 1024 / 1024;
-			write_entry($interfaces_state[$i]->[1]." ".
-				$interfaces_state[$i]->[3]." ".
+			my $iname = $interfaces_state[$i]->[1];
+			my $iaddr = $interfaces_state[$i]->[3];
+			# can arrive undefined here?
+			next if (not defined($iname)) or (not defined($iaddr));
+			write_entry($iname." ".$iaddr." ".
 				get_scaled_bytes($txbyt)."/".
 				get_scaled_bytes($rxbyt),
 				color_by_threshold($alltransfer, 1.2, 70));

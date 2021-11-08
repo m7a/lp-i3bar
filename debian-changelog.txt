@@ -1,3 +1,9 @@
+mdvl-i3bar (1.0.24) stable; urgency=medium
+
+  * Attempt to fix crash in line 570.
+
+ -- Linux-Fan, Ma_Sys.ma <Ma_Sys.ma@web.de>  Mon, 08 Nov 2021 11:22:24 +0100
+
 mdvl-i3bar (1.0.23) stable; urgency=medium
 
   * Fix acpi remaining battery percentage thresholds.

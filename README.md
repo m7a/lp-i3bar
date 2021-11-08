@@ -94,7 +94,8 @@ status information as part of a possibly larger status bar.
 
 Example:
 
-	(TODO NEED A LAPTOP FOR THAT)
+	$ ./ma_acpi_status
+	D █████████░ 96% 10:17:57
 
 The Legacy
 ==========
@@ -144,7 +145,7 @@ The following items were in the status bar.
    (because it is running in a virtual machine, it cannot know that it only
    has e.g. two physical cores).
  * Screenindex information in gray. The SCR gauge visualizes the output of
-   `screenindex -v d current -r`, see [screeninde(32)](screenindex.xhtml) for
+   `screenindex -v d current -r`, see [screenindex(32)](screenindex.xhtml) for
    details.
  * Red text which may contain CPU temperature information if detected, inside
    the VM that is just `N_SUPPORT` to indicate _not supported_.
@@ -198,6 +199,7 @@ information is displayed:
  * green RAM gauge (displays as empty in the example, because the VM has much
    more RAM assigned than used)
  * cyan Swap gauge
+ * blue root filesystem disk usage gauge
  * grey Screenindex gauge
  * Magenta network information. The first (unlabelled) entry displays the
    current upload/download activity. The other (potentially multiple) entries
