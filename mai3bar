@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# Ma_Sys.ma i3bar Script 1.0.8, Copyright (c) 2020, 2021 Ma_Sys.ma.
+# Ma_Sys.ma i3bar Script 1.0.9, Copyright (c) 2020, 2021, 2022 Ma_Sys.ma.
 # For further info send an e-mail to Ma_Sys.ma@web.de.
 
 # This code incoporates an external module under different copyright, see
@@ -575,7 +575,8 @@ sub write_network_interfaces_block {
 				get_scaled_bytes($txbyt)."/".
 				get_scaled_bytes($rxbyt),
 				color_by_threshold($alltransfer, 1.2, 70));
-		} else {
+		} elsif(defined($interfaces_state[$i]->[1]) and
+					defined($interfaces_state[$i]->[3])) {
 			# Fallback if newly added network interface is detected.
 			# Does not provide the stats but at lest the IP addr.
 			# Might one day report this as a bug for
@@ -585,6 +586,8 @@ sub write_network_interfaces_block {
 					$interfaces_state[$i]->[3]." [nostats]",
 					COLOR_CRIT);
 		}
+		# else: Skip silently over those interfaces that have just been
+		#       removed
 	}
 }
 

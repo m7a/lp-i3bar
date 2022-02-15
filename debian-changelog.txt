@@ -1,3 +1,9 @@
+mdvl-i3bar (1.0.25) stable; urgency=medium
+
+  * Attempt fo fix crach upon removing network interfaces (VM startup/stop).
+
+ -- Linux-Fan, Ma_Sys.ma <Ma_Sys.ma@web.de>  Tue, 15 Feb 2022 21:17:25 +0100
+
 mdvl-i3bar (1.0.24) stable; urgency=medium
 
   * Attempt to fix crash in line 570.
