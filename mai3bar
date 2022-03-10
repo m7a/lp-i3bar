@@ -36,7 +36,7 @@ use constant BGCOLOR_USED => "#005050";
 use constant BGCOLOR_FREE => "#003030";
 use constant I3_STAPLES   => ",\"separator\":false,\"separator_block_width\":0";
 
-my $use_json;
+my $use_json               = 0;
 my $is_first_entry         = 0;
 my $system_is_on_ac        = 1;
 my $perform_rare_tasks_now = 0;
@@ -48,7 +48,6 @@ sub handle_sigusr_1 {
 
 sub main {
 	my $calendar = undef;
-	my $use_json = 0;
 	Getopt::Long::GetOptions("ical=s" => \$calendar, "json" => \$use_json);
 
 	my $lxs = Sys::Statistics::Linux->new(
