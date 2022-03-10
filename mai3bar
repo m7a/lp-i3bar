@@ -1,9 +1,11 @@
 #!/usr/bin/perl
-# Ma_Sys.ma i3bar Script 1.0.9, Copyright (c) 2020, 2021, 2022 Ma_Sys.ma.
+# Ma_Sys.ma i3bar Script 1.0.10, Copyright (c) 2020, 2021, 2022 Ma_Sys.ma.
 # For further info send an e-mail to Ma_Sys.ma@web.de.
 
 # This code incoporates an external module under different copyright, see
 # section "BEGIN CpuTopology.pm Module"
+
+# PROPOSED FIX FOR DiskStats.pm if ($line =~ /^\s+(\d+)\s+(\d+)\s+(\S+)\s+(\d+)\s+\d+\s+(\d+)\s+\d+\s+(\d+)\s+\d+\s+(\d+)\s+\d+\s+\d+\s+\d+\s+\d+(?:(?:\s+\d+)+)?$/) {  -> https://rt.cpan.org/Public/Bug/Display.html?id=128904
 
 use     5.010;
 use     strict;
@@ -17,12 +19,14 @@ require IO::Socket;
 require IO::Interface::Simple;  # libio-interface-perl
 require Sys::Statistics::Linux; # libsys-statistics-linux-perl
 require File::Which;            # libfile-which-perl
+require Getopt::Long;
+require LWP::Simple;
+require iCal::Parser;           # libical-parser-perl
 
 use     Try::Tiny;
 use     File::Basename;
 
 use Data::Dumper 'Dumper'; # debug only
-# TODO z PROPOSED FIX FOR DiskStats.pm if ($line =~ /^\s+(\d+)\s+(\d+)\s+(\S+)\s+(\d+)\s+\d+\s+(\d+)\s+\d+\s+(\d+)\s+\d+\s+(\d+)\s+\d+\s+\d+\s+\d+\s+\d+(?:(?:\s+\d+)+)?$/) {  -> https://rt.cpan.org/Public/Bug/Display.html?id=128904
 
 use constant COLOR_NORM   => "#eeeeee";
 use constant COLOR_WARN   => "#ffff00";
@@ -43,7 +47,9 @@ sub handle_sigusr_1 {
 }
 
 sub main {
-	$use_json = ($#_ == 0 and $_[0] eq "--json");
+	my $calendar = undef;
+	my $use_json = 0;
+	Getopt::Long::GetOptions("ical=s" => \$calendar, "json" => \$use_json);
 
 	my $lxs = Sys::Statistics::Linux->new(
 		sysinfo   => 1,
@@ -95,7 +101,8 @@ sub main {
 				$rare_task_interval_secs, $timestamp[1]);
 		}
 
-		write_blocks($lxs->get, \@timestamp, $perform_rare_tasks);
+		write_blocks($lxs->get, \@timestamp, $perform_rare_tasks,
+								$calendar);
 		# maximum delay for battery systems
 		$intidx = $#intervals if(not $system_is_on_ac);
 		
@@ -107,7 +114,7 @@ sub main {
 }
 
 sub write_blocks {
-	my ($stats, $timestamp_ref, $perform_rare_tasks) = @_;
+	my ($stats, $timestamp_ref, $perform_rare_tasks, $calendar) = @_;
 
 	$is_first_entry = 1;
 
@@ -123,6 +130,7 @@ sub write_blocks {
 	write_screenindex_block($perform_rare_tasks);
 	write_network_interfaces_block($perform_rare_tasks, $stats->{netstats});
 	write_acpi_battery_block($perform_rare_tasks);
+	write_calendar_block($perform_rare_tasks, $timestamp_ref, $calendar);
 	write_ups_block($perform_rare_tasks);
 
 	write_loadavg_block($stats->{loadavg});
@@ -635,6 +643,78 @@ sub write_acpi_battery_block {
 
 	write_entry($acpi_output_text, $acpi_output_color)
 						if($acpi_output_text ne "");
+}
+
+sub write_calendar_block {
+	state $after_rare_tasks = 0;
+	state $event_to_come = undef;
+
+	my ($perform_rare_tasks, $timestamp_ref, $calendar) = @_;
+
+	return unless defined($calendar);
+
+	my $now = DateTime->from_epoch(epoch => $timestamp_ref->[0],
+							time_zone => "UTC");
+
+	if($perform_rare_tasks) {
+		$after_rare_tasks--;
+	}
+
+	if($after_rare_tasks <= 0) {
+		my $content = LWP::Simple::get($calendar);
+
+		# recommended in combination with patch
+		# https://rt.cpan.org/Public/Bug/Display.html?id=62169
+		$content =~ s/W. Europe Standard Time/Europe\/Berlin/g;
+
+		# https://perlmeister.com/snapshots/201012/index.html
+		my $today    = $now->clone()->truncate(to => "day");
+		my $tomorrow = $now->clone()->add(days => 2)->truncate(
+							to => "day");
+		my $parser   = iCal::Parser->new(start => $today,
+							end => $tomorrow);
+		my $calendar = $parser->parse_strings($content);
+		my $year     = $now->year;
+		my $month    = $now->month;
+		my $day      = $now->day;
+
+		if(defined($calendar->{events}->{$year}->{$month}->{$day+1})) {
+			my $events_today = $calendar->{events}->{$year}->{
+							$month}->{$day + 1};
+			my @events_to_come = ();
+			for my $key (keys %{$events_today}) {
+				next if($now > $events_today->{$key}->{DTEND});
+				push @events_to_come, ($events_today->{
+							$key}->{DTSTART});
+			}
+			@events_to_come = sort @events_to_come;
+			$event_to_come = defined($events_to_come[0])?
+						$events_to_come[0]: undef;
+		}
+		
+		# run only every 5 min by default
+		$after_rare_tasks = 5;
+	}
+
+	my $msg = "EVDLY";
+	my $color = COLOR_NORM;
+	if(defined($event_to_come)) {
+		my $dt = $event_to_come->subtract_datetime_absolute($now
+							)->in_units("seconds");
+		if($dt < 3600) {
+			$msg = sprintf("EV%+02dm", $dt / 60);
+			if($dt < 300) {
+				$color = COLOR_CRIT;
+			} elsif($dt < 900) {
+				$color = COLOR_WARN;
+			}
+		} elsif($dt < 3600 * 11) {
+			$msg = sprintf("EV+%02d:%02d", $dt / 3600,
+							($dt % 3600) / 60);
+		}
+	}
+
+	write_entry($msg, $color);
 }
 
 sub write_ups_block {
