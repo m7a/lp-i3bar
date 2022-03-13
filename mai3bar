@@ -668,7 +668,7 @@ sub write_calendar_block {
 
 		# https://perlmeister.com/snapshots/201012/index.html
 		my $today    = $now->clone()->truncate(to => "day");
-		my $tomorrow = $now->clone()->add(days => 2)->truncate(
+		my $tomorrow = $now->clone()->add(days => 1)->truncate(
 							to => "day");
 		my $parser   = iCal::Parser->new(start => $today,
 							end => $tomorrow);
@@ -677,9 +677,9 @@ sub write_calendar_block {
 		my $month    = $now->month;
 		my $day      = $now->day;
 
-		if(defined($calendar->{events}->{$year}->{$month}->{$day+1})) {
+		if(defined($calendar->{events}->{$year}->{$month}->{$day})) {
 			my $events_today = $calendar->{events}->{$year}->{
-							$month}->{$day + 1};
+							$month}->{$day};
 			my @events_to_come = ();
 			for my $key (keys %{$events_today}) {
 				next if($now > $events_today->{$key}->{DTEND});
