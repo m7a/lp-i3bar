@@ -8,7 +8,7 @@ author: ["Linux-Fan, Ma_Sys.ma (Ma_Sys.ma@web.de)"]
 keywords: ["i3", "i3bar", "mdvl", "package", "perl", "monitoring", "statusbar"]
 x-masysma-version: 1.0.0
 x-masysma-repository: https://www.github.com/m7a/lp-i3bar
-x-masysma-website: https://masysma.lima-city.de/32/i3bar.xhtml
+x-masysma-website: https://masysma.net/32/i3bar.xhtml
 x-masysma-owned: 1
 x-masysma-copyright: |
   Copyright (c) 2020 Ma_Sys.ma.
