@@ -1,3 +1,9 @@
+mdvl-i3bar (1.0.29) stable; urgency=medium
+
+  * Fix calendar in presence of strange time zone definitions.
+
+ -- Ma_Sys.ma Linux-Fan <info@masysma.net>  Fri, 01 Dec 2023 17:18:58 +0100
+
 mdvl-i3bar (1.0.28) stable; urgency=medium
 
   * Fix iCal offset.

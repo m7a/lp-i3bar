@@ -661,10 +661,18 @@ sub write_calendar_block {
 
 	if($after_rare_tasks <= 0) {
 		my $content = LWP::Simple::get($calendar);
+		if(not defined($content)) {
+			write_entry("EVTBD", COLOR_WARN);
+			$after_rare_tasks = 5;
+			return;
+		}
 
 		# recommended in combination with patch
 		# https://rt.cpan.org/Public/Bug/Display.html?id=62169
 		$content =~ s/W. Europe Standard Time/Europe\/Berlin/g;
+		$content =~ s/GMT Standard Time/UTC/g;
+		# WTF
+		$content =~ s/Romance Standard Time/Europe\/Berlin/g;
 
 		# https://perlmeister.com/snapshots/201012/index.html
 		my $today    = $now->clone()->truncate(to => "day");
@@ -682,9 +690,12 @@ sub write_calendar_block {
 							$month}->{$day};
 			my @events_to_come = ();
 			for my $key (keys %{$events_today}) {
-				next if($now > $events_today->{$key}->{DTEND});
-				push @events_to_come, ($events_today->{
-							$key}->{DTSTART});
+				my $tstart = $events_today->{$key}->{DTSTART};
+				my $tend   = $events_today->{$key}->{DTEND};
+				$tstart->set_time_zone("local") if($tstart->time_zone()->is_floating());
+				$tend->set_time_zone("local")   if($tend->time_zone()->is_floating());
+				next if($now > $tend);
+				push @events_to_come, ($tstart);
 			}
 			@events_to_come = sort @events_to_come;
 			$event_to_come = defined($events_to_come[0])?
